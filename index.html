@@ -1602,15 +1602,17 @@
         let scheduledSalary = 0;
         let scheduledExtra = 0;
         const recAmtFor = (r, mk) => (r && r.monthOverrides && Number(r.monthOverrides[mk]) > 0) ? Number(r.monthOverrides[mk]) : Number(r && r.amount || 0);
+        const isHistoricalMonth = curMKey < getTodayIso().slice(0, 7);
         (state.recurring || []).forEach(r => {
-          if (!r || r.active === false || r.type !== 'income') return;
+          if (isHistoricalMonth || !r || r.active === false || r.type !== 'income') return;
           if (monthTx.some(t => t.id === `rec-${r.id}-${curMKey}`)) return;
           if (r.startMonth && curMKey < r.startMonth) return;
           const mAmt = recAmtFor(r, curMKey);
           if (r.category === 'Sueldo') scheduledSalary += mAmt;
           else scheduledExtra += mAmt;
         });
-        const baseSalary = (loggedSalary + scheduledSalary) > 0 ? (loggedSalary + scheduledSalary) : (Number(state.settings.baseIncome) || 0);
+        const salary = loggedSalary + scheduledSalary;
+        const baseSalary = salary || (isHistoricalMonth ? 0 : Number(state.settings.baseIncome) || 0);
         const effIncome = baseSalary + loggedExtra + scheduledExtra;
         const rawGoal = Number(state.settings.savingsGoal) || 0;
         const goal = rawGoal > 0 ? rawGoal : (effIncome > 0 ? Math.round(effIncome * 0.20 * 100) / 100 : 0);
