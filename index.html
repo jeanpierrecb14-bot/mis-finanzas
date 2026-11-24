@@ -1,0 +1,2632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#003e51">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <script>
+    (() => {
+      const url = new URL(location.href);
+      const token = url.searchParams.get('token');
+      if (token === null) return;
+      url.searchParams.delete('token');
+      history.replaceState(history.state, '', url);
+      if (/^[A-Za-z0-9_-]{24}$/.test(token)) {
+        try { localStorage.setItem('mis-finanzas:pwa-token', token); } catch (_) {}
+      }
+    })();
+  </script>
+  <style>
+    #pwaLogin { max-width: 440px; margin: 12vh auto; padding: 2rem; border-radius: 1.5rem; color: #003e51; background: white; }
+    #pwaLogin input, #pwaLogin button { display:block; width:100%; padding:.8rem; margin-top:.7rem; border:1px solid #487989; border-radius:.65rem; }
+    #pwaLogin button { background:#003e51; color:white; }
+    #pwaLogin h1 { font-size:1.5rem; font-weight:700; }
+    #pwaTokenSettings { margin: 1rem auto; display:block; color:#245e73; text-decoration:underline; }
+    #pwaTokenSettings[hidden], #pwaLogin[hidden], .app-shell[hidden] { display:none !important; }
+  </style>
+  <title>Mis Finanzas</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --green: #245E73;
+      --border: #dce6ed;
+      --petrol-dark: #245E73;
+      --petrol-mid: #2B7C85;
+      --petrol-soft: #4D7E87;
+      --ice-cyan: #E4F9FD;
+      --bright-cyan: #38D3E8;
+      --warm-orange: #F48C37;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .ms-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1em;
+      height: 1em;
+      flex-shrink: 0;
+    }
+    .ms-icon svg { width: 100%; height: 100%; fill: currentColor; display: block; }
+    body {
+      background: radial-gradient(circle at 20% 0%, #e4f5f9 0%, #eef2f5 55%, #e8eef3 100%);
+      color: #191c1e;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app-shell {
+      max-width: 440px;
+      margin: 0 auto;
+      height: 100dvh;
+      overflow: hidden;
+      background: linear-gradient(180deg, #f8f9fb 0%, #f2f5f8 100%);
+      position: relative;
+      box-shadow: 0 24px 60px rgba(0, 62, 81, 0.12);
+    }
+    @media (min-width: 640px) {
+      body { padding: 18px 0; }
+      .app-shell {
+        height: calc(100dvh - 36px);
+        border-radius: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.85);
+      }
+    }
+    .stitch-glass {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      box-shadow: 0 8px 24px rgba(0, 62, 81, 0.05);
+    }
+    .hero-card {
+      background: linear-gradient(155deg, #003e51 0%, #175468 58%, #216b78 100%);
+      box-shadow: 0 16px 36px rgba(0, 62, 81, 0.22);
+    }
+    .fab-dock {
+      background: linear-gradient(135deg, #0a6871 0%, #003e51 100%);
+      box-shadow: 0 10px 24px rgba(0, 62, 81, 0.34);
+    }
+    .fab-dock:active { transform: scale(0.92); }
+    .card-orange {
+      background: linear-gradient(145deg, #9a4d08 0%, #7a3b00 100%);
+      box-shadow: 0 12px 26px rgba(126, 62, 0, 0.22);
+    }
+    .card-petrol {
+      background: linear-gradient(145deg, #1f566a 0%, #003e51 100%);
+      box-shadow: 0 12px 26px rgba(0, 62, 81, 0.22);
+    }
+    .outing-day {
+      min-height: 42px;
+      border: 1px solid #b6d6df;
+      border-radius: 12px;
+      background: #ffffff;
+      color: #215368;
+      font-size: 0.78rem;
+      font-weight: 700;
+      transition: all 0.15s ease;
+    }
+    .outing-day[aria-pressed="true"] {
+      color: #ffffff;
+      background: #c2410c;
+      border-color: #c2410c;
+      box-shadow: 0 4px 10px rgba(194, 65, 12, 0.28);
+    }
+    [hidden] { display: none !important; }
+    #sheetStatus[data-error="true"] { color: #fecdd3; }
+    #mainScroll { min-height: 0; padding-bottom: calc(7.5rem + env(safe-area-inset-bottom)); }
+    .sheet-dialog[open] {
+      display: flex;
+      margin: 0 auto;
+      padding: 0;
+      width: min(100%, 440px);
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      color: inherit;
+    }
+    .sheet-dialog::backdrop { background: rgba(15, 23, 42, 0.42); backdrop-filter: blur(4px); animation: backdropIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .sheet-dialog > .sheet-slide { padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); will-change: transform, opacity; }
+    .nav-btn { min-height: 44px; -webkit-tap-highlight-color: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    button { -webkit-tap-highlight-color: transparent; }
+    button:active { transform: scale(0.97); }
+    .sheet-slide { animation: appleSheetUp 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes backdropIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes appleSheetUp {
+      from { transform: translate3d(0, 48px, 0) scale(0.985); opacity: 0; }
+      to { transform: translate3d(0, 0, 0) scale(1); opacity: 1; }
+    }
+    .tab-enter { will-change: transform, opacity; animation: appleTabIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+    @keyframes appleTabIn {
+      from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.992); }
+      to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+    }
+    .nav-btn { transition: color 0.16s cubic-bezier(0.22, 1, 0.36, 1), transform 0.16s cubic-bezier(0.22, 1, 0.36, 1); }
+    .nav-btn:active { transform: scale(0.91); }
+    .nav-btn[aria-current="page"] .ms-icon { transform: translateY(-1px) scale(1.1); transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    #heroIllus .hero-plant { transform-box: fill-box; transform-origin: 50% 100%; }
+    #heroIllus .hero-bar { transform-box: fill-box; transform-origin: 50% 100%; }
+    #heroIllus .hero-dot { transform-box: fill-box; transform-origin: 50% 50%; }
+    #heroIllus.play-anim .hero-plant { animation: plantPop 0.52s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    #heroIllus.play-anim .hero-bar-1 { animation: barStep 0.36s 0.14s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+    #heroIllus.play-anim .hero-bar-2 { animation: barStep 0.36s 0.24s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+    #heroIllus.play-anim .hero-bar-3 { animation: barStep 0.36s 0.34s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+    #heroIllus.play-anim .hero-dot-1 { animation: dotPop 0.28s 0.42s cubic-bezier(0.34, 1.6, 0.64, 1) both; }
+    #heroIllus.play-anim .hero-dot-2 { animation: dotPop 0.28s 0.52s cubic-bezier(0.34, 1.6, 0.64, 1) both; }
+    @keyframes plantPop {
+      0% { opacity: 0; transform: scale(0.62) translateY(8px); }
+      65% { opacity: 1; transform: scale(1.1) translateY(-1px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes barStep {
+      0% { opacity: 0; transform: scaleY(0); }
+      70% { opacity: 1; transform: scaleY(1.08); }
+      100% { opacity: 1; transform: scaleY(1); }
+    }
+    @keyframes dotPop {
+      0% { opacity: 0; transform: scale(0.3); }
+      65% { opacity: 1; transform: scale(1.25); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .mini-coin-drop { animation: miniCoinLoop 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 50%; }
+    .mini-pig-bob { animation: miniPigNod 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 80%; }
+    @keyframes miniCoinLoop {
+      0%, 15% { opacity: 0; transform: translateY(-7px) scale(0.75); }
+      30% { opacity: 1; transform: translateY(-3px) scale(1); }
+      55% { opacity: 1; transform: translateY(5px) scale(0.92); }
+      68%, 100% { opacity: 0; transform: translateY(7px) scale(0.5); }
+    }
+    @keyframes miniPigNod {
+      0%, 52%, 100% { transform: scale(1, 1); }
+      62% { transform: scale(1.06, 0.93) translateY(1px); }
+      74% { transform: scale(0.97, 1.04) translateY(-1px); }
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"] { -moz-appearance: textfield; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+  <style>
+    .celebration{height:78px;position:relative;margin-top:4px;background:radial-gradient(ellipse at center,#e3f3e7 0,transparent 64%);animation:appear 1.45s ease both}.pig{position:absolute;width:78px;height:52px;inset:20px auto auto 50%;translate:-50%;animation:nod .45s .39s cubic-bezier(.25,.7,.3,1) both}.pig-body{position:absolute;inset:4px 13px 5px 4px;border-radius:48% 45% 42% 46%;background:linear-gradient(145deg,#ffc3cf 4%,#f1a1b8 53%,#df779a);box-shadow:inset 0 -3px 4px #ab4f7024,0 5px 7px #865b6830}.pig-ear{position:absolute;z-index:2;right:18px;top:0;width:15px;height:18px;border-radius:75% 85% 56% 50%;transform:rotate(-24deg);background:linear-gradient(#ffd1dc,#ed9db6)}.pig-snout{position:absolute;right:5px;top:22px;width:18px;height:14px;border-radius:45%;background:linear-gradient(#ffcbd7,#f2a7ba);box-shadow:inset -2px -1px 1px #bb62732b}.pig-eye,.pig-slot,.pig-leg,.pig-nose{position:absolute;background:#744458}.pig-eye{z-index:3;right:20px;top:17px;width:4px;height:5px;border-radius:50%}.pig-slot{z-index:3;left:27px;top:8px;width:14px;height:2px;border-radius:4px}.pig-nose{right:9px;top:27px;width:2px;height:4px;border-radius:60%;box-shadow:-4px 0 #744458}.pig-leg{bottom:2px;width:9px;height:12px;background:#e186a1;border-radius:2px 2px 5px 5px}.pig-leg.front{left:49px}.pig-leg.back{left:19px}.coin{position:absolute;z-index:4;top:17px;left:calc(50% - 13px);width:14px;height:14px;border:1px solid #b57a23;border-radius:50%;background:linear-gradient(145deg,#ffe6a3,#e8ac47);box-shadow:inset 0 0 0 2px #ffe4a3;animation:drop .44s cubic-bezier(.35,.05,.65,1) both}.spark{position:absolute;width:10px;height:10px;background:#d89b32;clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);animation:shine .65s .38s ease both}.spark.first{top:29px;left:calc(50% - 58px)}.spark.second{top:13px;left:calc(50% + 50px);width:8px;height:8px}.gain{position:absolute;top:35px;left:calc(50% + 49px);color:var(--green);font-size:.76rem;font-weight:750;animation:shine .9s .42s ease both}
+    @keyframes drop{0%{transform:translateY(-16px) scale(.75);opacity:0}20%{opacity:1}90%{transform:translateY(6px);opacity:1}100%{transform:translateY(9px) scale(.6);opacity:0}}@keyframes nod{30%{transform:translateY(3px) scale(1.04,.94)}70%{transform:translateY(-3px) scale(.98,1.04)}}@keyframes shine{0%{opacity:0;transform:translateY(5px) scale(.65)}45%{opacity:1;transform:translateY(-3px) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(.95)}}@keyframes appear{0%,100%{opacity:0}15%,85%{opacity:1}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.celebration{display:none!important}}
+  </style>
+</head>
+<body>
+  <section id="pwaLogin" aria-labelledby="pwaLoginTitle" hidden>
+    <h1 id="pwaLoginTitle">Mis Finanzas</h1>
+    <form id="pwaLoginForm">
+      <label for="pwaToken">Pega tu token para conectar la app.</label>
+      <input id="pwaToken" type="password" required minlength="24" maxlength="24" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <button type="submit">Conectar</button>
+      <p id="pwaLoginError" role="alert"></p>
+    </form>
+  </section>
+  <div class="app-shell flex flex-col">
+    <h1 class="sr-only">Mis Finanzas — Control de gastos y ahorro</h1>
+
+    <!-- Scrollable Main Area -->
+    <div id="mainScroll" class="flex-1 overflow-y-auto">
+
+      <!-- TAB 1: INICIO (Stitch Frosted Glass Design) -->
+      <section id="tabInicio" class="px-4 pt-4 space-y-3.5">
+        <!-- Floating Rounded Petrol Hero Card -->
+        <div class="hero-card text-white rounded-[26px] p-4 relative overflow-hidden">
+          <div class="absolute -top-12 -right-12 w-36 h-36 rounded-full bg-[#38D3E8]/10 pointer-events-none"></div>
+          <div class="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-white/5 pointer-events-none"></div>
+
+          <div class="flex items-center justify-between gap-2 relative z-10">
+            <div class="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-cyan-100/85 bg-white/10 px-2.5 py-1 rounded-full max-w-[105px] truncate">
+              <span id="syncDot" class="w-1.5 h-1.5 rounded-full bg-[#45E1F1] shrink-0"></span>
+              <span id="sheetStatus" role="status" class="truncate">SYNC</span>
+              <button id="reloadMonth" type="button" class="underline text-white shrink-0" hidden>!</button>
+            </div>
+            <div class="flex items-center gap-0.5 bg-white/12 rounded-full px-1.5 py-0.5">
+              <button id="btnPrevMonth" type="button" aria-label="Mes anterior" class="w-11 h-11 -my-2 -ml-1.5 rounded-full hover:bg-white/20 flex items-center justify-center transition">
+                <span class="ms-icon text-[18px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg></span>
+              </button>
+              <span id="monthLabel" class="text-[11px] font-bold px-1.5 capitalize select-none">Cargando…</span>
+              <button id="btnNextMonth" type="button" aria-label="Mes siguiente" class="w-11 h-11 -my-2 -mr-1.5 rounded-full hover:bg-white/20 flex items-center justify-center transition">
+                <span class="ms-icon text-[18px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg></span>
+              </button>
+            </div>
+            <button id="btnTogglePrivacy" type="button" aria-label="Ocultar saldo" aria-pressed="false" title="Ocultar saldo"
+              class="w-11 h-11 -my-2 -mr-1.5 rounded-full bg-white/12 hover:bg-white/20 flex items-center justify-center transition shrink-0">
+              <span class="ms-icon text-[17px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-80q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></svg></span>
+            </button>
+          </div>
+
+          <div class="mt-3.5 mb-3 flex items-center justify-between gap-2 px-1 relative z-10">
+            <div class="min-w-0">
+              <p class="text-[11px] uppercase tracking-widest text-cyan-100/75 font-bold">Balance disponible</p>
+              <div id="heroBalance" class="text-[28px] font-extrabold tracking-tight leading-tight mt-0.5 truncate">—</div>
+              <p id="heroTodaySpent" class="text-[11px] text-cyan-100/80 mt-0.5 font-medium">—</p>
+            </div>
+            <svg id="heroIllus" class="play-anim shrink-0" width="96" height="54" viewBox="0 0 176 92" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M22 68C10 52 24 22 52 20C74 18 82 28 106 24C132 20 158 34 156 58C154 78 128 84 90 84C54 84 32 82 22 68Z" fill="#FFF4E3" fill-opacity="0.92"/>
+              <ellipse cx="88" cy="76" rx="22" ry="5" fill="#D97706" fill-opacity="0.25"/>
+              <rect x="74" y="65" width="28" height="7" rx="3.5" fill="#F59E0B"/>
+              <rect x="76" y="57" width="24" height="7" rx="3.5" fill="#FBBF24"/>
+              <rect x="79" y="49" width="18" height="7" rx="3.5" fill="#F59E0B"/>
+              <g class="hero-plant">
+                <path d="M88 49V26" stroke="#059669" stroke-width="3" stroke-linecap="round"/>
+                <path d="M88 38C78 36 73 30 74 23C82 23 87 28 88 38Z" fill="#10B981"/>
+                <path d="M88 34C98 31 103 24 101 17C93 18 89 24 88 34Z" fill="#34D399"/>
+                <circle cx="88" cy="17" r="10" fill="#F59E0B"/>
+                <circle cx="88" cy="17" r="7.5" fill="#FCD34D"/>
+                <text x="88" y="21" text-anchor="middle" fill="#B45309" font-size="10" font-weight="800">S/</text>
+              </g>
+              <rect class="hero-bar hero-bar-1" x="120" y="52" width="6" height="16" rx="3" fill="#2B7C85"/>
+              <rect class="hero-bar hero-bar-2" x="129" y="44" width="6" height="24" rx="3" fill="#38D3E8"/>
+              <rect class="hero-bar hero-bar-3" x="138" y="36" width="6" height="32" rx="3" fill="#F48C37"/>
+              <circle class="hero-dot hero-dot-1" cx="44" cy="40" r="5" fill="#38D3E8" fill-opacity="0.85"/>
+              <circle class="hero-dot hero-dot-2" cx="52" cy="54" r="3.5" fill="#F48C37" fill-opacity="0.85"/>
+            </svg>
+          </div>
+
+          <!-- Frosted Glass Inset: Ingresos, Gastos & Monthly Cap Progress -->
+          <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 space-y-2.5 relative z-10">
+            <div class="grid grid-cols-2 divide-x divide-white/15">
+              <div class="pr-3">
+                <div class="text-[11px] uppercase tracking-wider text-cyan-100/75 font-bold">Ingresos</div>
+                <div id="heroIncome" class="text-sm font-extrabold text-white mt-0.5 truncate">—</div>
+              </div>
+              <div class="pl-3 text-right">
+                <div class="text-[11px] uppercase tracking-wider text-cyan-100/75 font-bold">Gastos</div>
+                <div id="heroExpenses" class="text-sm font-extrabold text-white mt-0.5 truncate">—</div>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-white/15">
+              <div class="flex items-center justify-between text-[11px] mb-1">
+                <div id="heroAlertPill" class="inline-flex items-center gap-1.5 font-semibold text-cyan-100">
+                  <span id="heroAlertDot" class="w-1.5 h-1.5 rounded-full bg-[#45E1F1]"></span>
+                  <span id="heroAlertText">Tope mensual</span>
+                </div>
+                <span id="stripCapRatio" class="font-extrabold text-white">—</span>
+              </div>
+              <div class="w-full h-1.5 bg-white/15 rounded-full overflow-hidden">
+                <div id="stripCapBar" class="h-full rounded-full bg-[#45E1F1] transition-all duration-300" style="width: 0%"></div>
+              </div>
+              <div class="flex justify-end text-[11px] text-cyan-100/75 mt-1">
+                <span id="stripCapRemaining">—</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Frosted Animated Piggy-Bank 20% Savings Nudge -->
+        <div id="piggyNudgeCard" hidden class="stitch-glass rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-10 h-10 rounded-xl bg-[#ffdcc6] text-[#713700] flex items-center justify-center shrink-0 relative overflow-hidden">
+              <svg width="26" height="26" viewBox="0 -1060 960 1060" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <g class="mini-coin-drop">
+                  <circle cx="430" cy="-860" r="88" fill="#F59E0B"/>
+                  <circle cx="430" cy="-860" r="56" fill="#FCD34D"/>
+                </g>
+                <g class="mini-pig-bob">
+                  <path fill="#713700" d="M640-520q17 0 28.5-11.5T680-560q0-17-11.5-28.5T640-600q-17 0-28.5 11.5T600-560q0 17 11.5 28.5T640-520Zm-320-80h200v-80H320v80ZM180-120q-34-114-67-227.5T80-580q0-92 64-156t156-64h200q29-38 70.5-59t89.5-21q25 0 42.5 17.5T720-820q0 6-1.5 12t-3.5 11q-4 11-7.5 22.5T702-751l91 91h87v279l-113 37-67 224H480v-80h-80v80H180Z"/>
+                  <circle cx="640" cy="-560" r="36" fill="#ffdcc6"/>
+                  <rect x="320" y="-680" width="200" height="72" rx="36" fill="#ffdcc6"/>
+                </g>
+              </svg>
+            </div>
+            <div class="min-w-0">
+              <div id="piggyNudgeTitle" class="text-xs font-extrabold text-[#191c1e] truncate">Ahorra el 20% de tu sueldo</div>
+              <div id="piggyNudgeSub" class="text-[11px] text-[#40484c] truncate">Toca para apartar</div>
+            </div>
+          </div>
+          <button id="btnQuickSaveGoal" type="button"
+            class="px-3.5 py-1.5 rounded-full bg-[#003e51] hover:bg-[#1f566a] text-white text-xs font-bold transition shrink-0">
+            Ahorrar
+          </button>
+        </div>
+
+        <!-- Frosted White "Disponible hoy" Card -->
+        <section id="dailyBudget" hidden class="stitch-glass rounded-3xl p-4 text-[#191c1e] space-y-3" aria-labelledby="dailyHeading">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <h2 id="dailyHeading" class="text-[11px] font-bold uppercase tracking-wider text-[#525a5e]">Disponible hoy</h2>
+                <span id="dailyPaceBadge" class="hidden px-1.5 py-0.5 rounded-md text-[11px] font-bold"></span>
+              </div>
+              <p class="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                <span id="dailyLeft" class="text-xl font-extrabold tracking-tight text-[#003e51]">—</span>
+                <span id="dailyLeftSuffix" class="text-xs font-medium text-[#525a5e]">para hoy</span>
+              </p>
+            </div>
+            <button id="btnOpenOutings" type="button"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f2f4f6] text-[#003e51] border border-slate-200/80 text-xs font-bold hover:bg-[#a3eff9]/40 transition shrink-0">
+              <span class="ms-icon text-[16px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m80-80 200-560 360 360L80-80Zm132-132 282-100-182-182-100 282Zm370-246-42-42 224-224q32-32 77-32t77 32l24 24-42 42-24-24q-14-14-35-14t-35 14L582-458ZM422-618l-42-42 24-24q14-14 14-35t-14-35l-24-24 42-42 24 24q32 32 32 77t-32 77l-24 24Zm80 80-42-42 144-144q14-14 14-35t-14-35l-64-64 42-42 64 64q32 32 32 77t-32 77L502-538Zm160 160-42-42 64-64q32-32 77-32t77 32l64 64-42 42-64-64q-14-14-35-14t-35 14l-64 64Z"/></svg></span>
+              <span>Salida</span>
+            </button>
+          </div>
+
+          <div>
+            <div class="w-full h-1.5 bg-[#eceef0] rounded-full overflow-hidden">
+              <div id="dailyBarFill" class="h-full rounded-full bg-[#0a6871] transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <p id="dailyDetail" class="mt-1.5 text-[11px] font-medium text-[#40484c] leading-snug"></p>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span id="remainingDaysLabel" class="text-[11px] font-bold uppercase tracking-wider text-[#525a5e]">Resto del mes</span>
+              <span class="text-[11px] text-[#525a5e]">Toca un día</span>
+            </div>
+            <ul id="outingNextDays" class="flex gap-2 overflow-x-auto no-scrollbar pb-0.5"></ul>
+            <p id="specialDaysBanner" hidden class="mt-2 text-[11px] font-semibold text-[#7e3e00] bg-[#ffdcc6]/60 rounded-xl px-2.5 py-1.5 leading-snug"></p>
+          </div>
+        </section>
+
+        <!-- Movimientos with Stitch Pill Filter Tabs -->
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between px-0.5">
+            <h2 class="text-sm font-extrabold text-[#191c1e]">Movimientos</h2>
+            <select id="filterType" class="sr-only" aria-label="Filtrar movimientos">
+              <option value="ALL">Todos</option>
+              <option value="expense">Egresos</option>
+              <option value="income">Ingresos</option>
+              <option value="saving">Ahorros</option>
+            </select>
+          </div>
+          <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <button type="button" data-filter-pill="ALL" class="filter-pill min-h-[40px] px-3.5 py-2 rounded-full text-xs font-bold bg-[#003e51] text-white transition shrink-0">Todos</button>
+            <button type="button" data-filter-pill="expense" class="filter-pill min-h-[40px] px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-[#40484c] border border-slate-200/80 transition shrink-0">Egresos</button>
+            <button type="button" data-filter-pill="income" class="filter-pill min-h-[40px] px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-[#40484c] border border-slate-200/80 transition shrink-0">Ingresos</button>
+            <button type="button" data-filter-pill="saving" class="filter-pill min-h-[40px] px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-[#40484c] border border-slate-200/80 transition shrink-0">Ahorros</button>
+          </div>
+
+          <div id="txListContainer" class="space-y-2"></div>
+          <div id="txListEmpty" class="hidden py-8 text-center stitch-glass rounded-2xl">
+            <p class="text-sm font-bold text-slate-600">Sin movimientos este mes</p>
+            <p class="text-xs text-slate-600 mt-1">Toca el botón central <strong>+</strong> para registrar tu primer gasto.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: RESUMEN / GRÁFICOS (Stitch + Data Viz UI Design) -->
+      <section id="tabResumen" class="hidden px-4 pt-4 space-y-4">
+        <!-- Interactive Month Switcher Bar -->
+        <div class="stitch-glass rounded-2xl px-2 py-1.5 flex items-center justify-between">
+          <button id="btnResumenPrev" type="button" aria-label="Mes anterior"
+            class="w-11 h-11 rounded-xl text-[#40484c] hover:bg-[#f2f4f6] flex items-center justify-center transition">
+            <span class="ms-icon text-[20px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z"/></svg></span>
+          </button>
+          <span id="resumenMonthSub" class="text-xs font-extrabold text-[#003e51] capitalize select-none">—</span>
+          <button id="btnResumenNext" type="button" aria-label="Mes siguiente"
+            class="w-11 h-11 rounded-xl text-[#40484c] hover:bg-[#f2f4f6] flex items-center justify-center transition">
+            <span class="ms-icon text-[20px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z"/></svg></span>
+          </button>
+        </div>
+
+        <!-- Card 1: Gastos por categoría with Centered Donut Metric + Bar Legend -->
+        <div class="stitch-glass rounded-3xl p-4 space-y-4">
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <h2 class="text-sm font-extrabold text-[#191c1e]">Gastos por categoría</h2>
+              <p class="text-[11px] text-[#525a5e]">Distribución del mes actual</p>
+            </div>
+            <span id="resumenTotalBadge" class="px-2.5 py-1 rounded-full bg-[#f2f4f6] text-[#003e51] text-[11px] font-extrabold">S/ 0.00</span>
+          </div>
+
+          <div class="relative h-52">
+            <canvas id="catChart" role="img" aria-label="Gráfico de gastos por categoría"></canvas>
+            <div id="catDonutCenter" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span class="text-[11px] font-bold uppercase tracking-widest text-[#525a5e]">Gastado</span>
+              <span id="resumenDonutVal" class="text-lg font-extrabold text-[#003e51] tracking-tight mt-0.5">S/ 0</span>
+            </div>
+            <div id="catChartEmpty" class="hidden absolute inset-0 flex flex-col items-center justify-center text-xs text-slate-600">
+              <span>Sin gastos registrados</span>
+            </div>
+          </div>
+
+          <div id="catLegend" class="space-y-3"></div>
+        </div>
+
+        <!-- Card 2: Gasto acumulado vs Tope mensual (Stitch Inset KPIs + Area Gradient Chart) -->
+        <div class="stitch-glass rounded-3xl p-4 space-y-3.5">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-extrabold text-[#191c1e]">Gasto acumulado vs Tope</h3>
+              <p class="text-[11px] text-[#525a5e]">Ritmo de consumo frente a tu límite</p>
+            </div>
+            <span id="resumenStatusPill" class="px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-[#a3eff9]/60 text-[#004f56] shrink-0">Bajo control</span>
+          </div>
+
+          <!-- Two Frosted Inset Metric Cards -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <div class="rounded-2xl bg-[#f2f4f6] p-3">
+              <span class="block text-[11px] font-bold uppercase tracking-wider text-[#525a5e]">Gasto acumulado</span>
+              <div id="resumenCumVal" class="text-base font-extrabold text-[#003e51] mt-0.5 truncate">—</div>
+              <span id="resumenCumSub" class="block text-[11px] font-semibold text-[#0a6871] mt-0.5">—</span>
+            </div>
+            <div class="rounded-2xl bg-[#ffdcc6]/45 p-3">
+              <span class="block text-[11px] font-bold uppercase tracking-wider text-[#7e3e00]/80">Tope mensual</span>
+              <div id="resumenCapVal" class="text-base font-extrabold text-[#713700] mt-0.5 truncate">—</div>
+              <span id="resumenCapSub" class="block text-[11px] font-semibold text-[#7e3e00] mt-0.5">—</span>
+            </div>
+          </div>
+
+          <div class="relative h-48 pt-1">
+            <canvas id="dailyChart" role="img" aria-label="Gráfico de gasto acumulado frente al tope mensual"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: METAS Y TOPES (Stitch Frosted Glass) -->
+      <section id="tabAhorro" class="hidden px-4 pt-4 space-y-4">
+        <div class="flex items-center justify-between px-0.5">
+          <h2 class="text-base font-extrabold text-[#191c1e] tracking-tight">Ahorro</h2>
+          <div class="w-8 h-8 rounded-full bg-[#003e51] text-white flex items-center justify-center shadow-xs">
+            <span class="ms-icon text-[18px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M640-520q17 0 28.5-11.5T680-560q0-17-11.5-28.5T640-600q-17 0-28.5 11.5T600-560q0 17 11.5 28.5T640-520Zm-320-80h200v-80H320v80ZM180-120q-34-114-67-227.5T80-580q0-92 64-156t156-64h200q29-38 70.5-59t89.5-21q25 0 42.5 17.5T720-820q0 6-1.5 12t-3.5 11q-4 11-7.5 22.5T702-751l91 91h87v279l-113 37-67 224H480v-80h-80v80H180Zm60-80h80v-80h240v80h80l62-206 98-33v-141h-40L620-720q0-20 2.5-38.5T630-796q-29 8-51 27.5T547-720H300q-58 0-99 41t-41 99q0 98 27 191.5T240-200Z"/></svg></span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="card-orange text-white rounded-3xl p-4 flex flex-col justify-between min-h-[118px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold uppercase tracking-wider opacity-85">Tope Máximo</span>
+              <span class="ms-icon text-[18px] opacity-85"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M240-400q0 52 21 98.5t60 81.5q-1-5-1-9v-9q0-32 12-60t35-51l113-111 113 111q23 23 35 51t12 60v9q0 4-1 9 39-35 60-81.5t21-98.5q0-50-18.5-94.5T648-574q-20 13-42 19.5t-45 6.5q-62 0-107.5-41T401-690q-39 33-69 68.5t-50.5 72Q261-513 250.5-475T240-400Zm240 52-57 56q-11 11-17 25t-6 29q0 32 23.5 55t56.5 23q33 0 56.5-23t23.5-55q0-16-6-29.5T537-292l-57-56Zm0-492v132q0 34 23.5 57t57.5 23q18 0 33.5-7.5T622-658l18-22q74 42 117 117t43 163q0 134-93 227T480-80q-134 0-227-93t-93-227q0-129 86.5-245T480-840Z"/></svg></span>
+            </div>
+            <div>
+              <div id="cardCapAmount" class="text-lg font-extrabold">—</div>
+              <div id="cardCapLeft" class="text-[11px] opacity-85 mt-0.5">—</div>
+            </div>
+          </div>
+
+          <div class="card-petrol text-white rounded-3xl p-4 flex flex-col justify-between min-h-[118px]">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-200">Meta de Ahorro</span>
+              <span class="ms-icon text-[18px] text-cyan-200"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M640-520q17 0 28.5-11.5T680-560q0-17-11.5-28.5T640-600q-17 0-28.5 11.5T600-560q0 17 11.5 28.5T640-520Zm-320-80h200v-80H320v80ZM180-120q-34-114-67-227.5T80-580q0-92 64-156t156-64h200q29-38 70.5-59t89.5-21q25 0 42.5 17.5T720-820q0 6-1.5 12t-3.5 11q-4 11-7.5 22.5T702-751l91 91h87v279l-113 37-67 224H480v-80h-80v80H180Zm60-80h80v-80h240v80h80l62-206 98-33v-141h-40L620-720q0-20 2.5-38.5T630-796q-29 8-51 27.5T547-720H300q-58 0-99 41t-41 99q0 98 27 191.5T240-200Z"/></svg></span>
+            </div>
+            <div>
+              <div id="cardGoalAmount" class="text-lg font-extrabold">—</div>
+              <div id="cardGoalProgress" class="text-[11px] text-cyan-100 mt-0.5">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="celebration" id="celebration" hidden aria-hidden="true"><div class="pig"><i class="pig-leg front"></i><i class="pig-leg back"></i><i class="pig-body"></i><i class="pig-ear"></i><i class="pig-snout"></i><i class="pig-eye"></i><i class="pig-slot"></i><i class="pig-nose"></i></div><i class="coin"></i><i class="spark first"></i><i class="spark second"></i><b class="gain" id="gain" data-private></b></div>
+
+        <div class="stitch-glass rounded-3xl p-4 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <span id="goalProgressTitle" class="text-xs font-extrabold uppercase tracking-wider text-[#525a5e]">Plan de ahorro mensual</span>
+            <span id="goalPctLabel" class="px-2.5 py-0.5 rounded-full bg-[#a3eff9]/60 text-[#004f56] text-[11px] font-extrabold">—</span>
+          </div>
+          <div class="w-full h-2.5 bg-[#eceef0] rounded-full overflow-hidden">
+            <div id="goalProgressBar" class="h-full rounded-full bg-[#0a6871] transition-all duration-300" style="width: 0%"></div>
+          </div>
+          <p id="coachBody" class="text-xs text-[#40484c] leading-relaxed"></p>
+          <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+            <span class="font-semibold text-[#525a5e]">Tasa de ahorro</span>
+            <span id="savingsRateLabel" class="font-extrabold text-[#003e51]">—</span>
+          </div>
+          <p id="savingsRateHint" class="hidden">Calculada con el dinero que apartaste este mes.</p>
+          <div class="space-y-2 pt-1">
+            <button id="btnQuickRegisterSaving" type="button"
+              class="w-full py-3 px-4 rounded-2xl bg-[#003e51] hover:bg-[#1f566a] text-white text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5">
+              <span class="ms-icon text-[17px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg></span>
+              <span>Registrar ahorro</span>
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btnApply20Rule" type="button"
+                class="py-2 px-3 rounded-xl bg-[#f2f4f6] text-[#003e51] text-[11px] font-bold hover:bg-[#a3eff9]/40 transition">
+                Sugerir meta (20%)
+              </button>
+              <button id="btnEditLimitsFromGoals" type="button"
+                class="py-2 px-3 rounded-xl bg-[#f2f4f6] text-[#40484c] text-[11px] font-bold hover:bg-slate-200/70 transition">
+                Editar límites
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="stitch-glass rounded-3xl p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <h3 class="text-sm font-extrabold text-[#191c1e] leading-tight">Sueldo y pagos fijos</h3>
+              <p id="recurringTotalMonthly" class="text-[11px] text-[#525a5e] mt-0.5">Ajusta tus montos recurrentes por mes</p>
+            </div>
+            <button id="btnAddRecurring" type="button"
+              class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#003e51] hover:bg-[#1f566a] text-white text-xs font-bold shadow-xs transition shrink-0">
+              <span class="ms-icon text-[16px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg></span>
+              <span>Nuevo</span>
+            </button>
+          </div>
+
+          <div id="recurringList" class="space-y-2"></div>
+          <div id="recurringEmpty" class="hidden rounded-2xl bg-[#f2f4f6] border border-dashed border-slate-300 p-4 text-center">
+            <p class="text-xs font-bold text-slate-600">Aún no tienes movimientos fijos</p>
+            <p class="text-[11px] text-slate-600 mt-0.5">Agrega tu sueldo, plan móvil o cursos en cuotas.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: AJUSTES (Unified 80/20 Split + Integrated Cap Alert) -->
+      <section id="tabAjustes" class="hidden px-4 pt-4 space-y-4">
+        <div class="flex items-center justify-between px-0.5">
+          <div>
+            <h2 class="text-base font-extrabold text-[#191c1e] tracking-tight">Ajustes</h2>
+            <p class="text-xs text-[#525a5e]">Distribución de tu sueldo y avisos de gasto</p>
+          </div>
+          <button id="btnReset8020" type="button"
+            class="min-h-[40px] px-3 py-1.5 rounded-full bg-[#a3eff9]/55 hover:bg-[#a3eff9] text-[#004f56] text-xs font-extrabold transition">
+            Regla 80 / 20
+          </button>
+        </div>
+
+        <form id="settingsForm" class="stitch-glass rounded-3xl p-4 space-y-4">
+          <!-- 1. Moneda e Ingreso base -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="setCurrency" class="block text-xs font-bold text-[#40484c] mb-1">Moneda</label>
+              <select id="setCurrency" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-base bg-[#f8f9fb] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30">
+                <option value="S/">S/ (Soles)</option>
+                <option value="$">$ (USD / Pesos)</option>
+                <option value="€">€ (Euros)</option>
+                <option value="MX$">MX$</option>
+                <option value="COP $">COP $</option>
+              </select>
+            </div>
+            <div>
+              <label for="setBaseIncome" class="block text-xs font-bold text-[#40484c] mb-1">Ingreso mensual</label>
+              <input id="setBaseIncome" type="number" step="0.01" min="0" required
+                class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-base font-extrabold text-[#003e51] bg-[#f8f9fb] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30" />
+            </div>
+          </div>
+
+          <!-- 2. Reparto visual del sueldo: Tope de gasto + Meta de ahorro -->
+          <div class="space-y-3 pt-1 border-t border-slate-100">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-[#191c1e]">Reparto de tu ingreso</span>
+              <span id="splitSummaryLabel" class="font-bold text-[#525a5e]">80% gastos · 20% ahorro</span>
+            </div>
+            <div class="w-full h-2.5 rounded-full bg-slate-200/80 overflow-hidden flex" aria-hidden="true">
+              <div id="splitCapBar" class="h-full bg-[#003e51] transition-all duration-300" style="width: 80%"></div>
+              <div id="splitSaveBar" class="h-full bg-[#0a6871] transition-all duration-300" style="width: 20%"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label for="setMaxCap" class="text-xs font-bold text-[#40484c] inline-flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-[#003e51]" aria-hidden="true"></span>
+                    <span>Tope de gasto</span>
+                  </label>
+                  <span id="capPctBadge" class="text-[11px] font-bold text-[#525a5e]">80%</span>
+                </div>
+                <input id="setMaxCap" type="number" step="0.01" min="0" required
+                  class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-base font-extrabold text-[#003e51] bg-[#f8f9fb] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#003e51]/30" />
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label for="setSavingsGoal" class="text-xs font-bold text-[#40484c] inline-flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-[#0a6871]" aria-hidden="true"></span>
+                    <span>Meta de ahorro</span>
+                  </label>
+                  <span id="savePctBadge" class="text-[11px] font-bold text-[#004f56]">20%</span>
+                </div>
+                <input id="setSavingsGoal" type="number" step="0.01" min="0" required
+                  class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-base font-extrabold text-[#0a6871] bg-[#f8f9fb] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30" />
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Aviso anticipado integrado al Tope de gasto (sin contradicción de porcentajes) -->
+          <div class="rounded-2xl bg-[#f8f9fb] border border-slate-200/80 p-3.5 space-y-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <label for="setThreshold" class="block text-xs font-bold text-[#191c1e]">Aviso antes de llegar al tope</label>
+                <p id="thresholdHint" class="text-xs text-[#525a5e] mt-0.5 leading-snug">Te avisaremos cuando te falten S/ 0 para tu tope.</p>
+              </div>
+              <div class="text-right shrink-0">
+                <div id="thresholdMoneyVal" class="text-sm font-extrabold text-[#9a3412] leading-tight">S/ 0</div>
+                <div id="thresholdVal" class="text-[11px] font-bold text-[#525a5e]">80% del tope</div>
+              </div>
+            </div>
+
+            <input id="setThreshold" type="range" min="50" max="95" step="1" value="80" class="w-full accent-[#c2410c] cursor-pointer" />
+
+            <div class="flex items-center justify-between text-[11px] font-semibold text-[#525a5e]">
+              <span>50% del tope</span>
+              <span id="thresholdCapRef" class="font-bold text-[#003e51]">Tope: S/ 0</span>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full py-3 rounded-2xl bg-[#003e51] hover:bg-[#1f566a] text-white font-bold text-sm transition shadow-xs">
+            Guardar configuración
+          </button>
+        </form>
+
+        <!-- Datos y Respaldo Card -->
+        <div class="stitch-glass rounded-3xl p-4 space-y-2.5">
+          <span class="block text-[11px] font-bold uppercase tracking-wider text-[#525a5e] px-0.5">Datos y respaldo</span>
+          <a id="sheetLinkBtn" target="_blank" rel="noopener" hidden
+            class="w-full py-2.5 px-4 rounded-2xl bg-[#f2f4f6] text-[#003e51] font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#a3eff9]/40 transition"
+            href="#">
+            Abrir mi hoja en Google Sheets
+          </a>
+          <button id="btnExportCsv" type="button"
+            class="w-full py-2.5 px-4 rounded-2xl bg-[#003e51] text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#1f566a] transition">
+            <span class="ms-icon text-[17px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/></svg></span>
+            <span>Exportar mes actual a CSV</span>
+          </button>
+        </div>
+      <button id="pwaTokenSettings" type="button" hidden>Cerrar sesión o cambiar token</button>
+      </section>
+
+    </div>
+
+    <!-- 5-Slot Bottom Navigation Bar with Docked Center (+) Action (Zero Overlap!) -->
+    <nav aria-label="Navegación principal" class="fixed sm:absolute bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur border-t border-slate-200/90 min-h-16 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] px-2 grid grid-cols-5 items-center">
+      <button type="button" data-tab="Inicio" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-[#1F566A]">
+        <span class="ms-icon text-[22px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Z"/></svg></span>
+        <span class="text-[11px] font-bold">Inicio</span>
+      </button>
+      <button type="button" data-tab="Resumen" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-600">
+        <span class="ms-icon text-[22px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M440-122q-121-15-200.5-105.5T160-440q0-134 93-227t227-93v320h320q0 121-79.5 212.5T520-122v-80q88-14 144-79.5T720-440H440v-280q-100 14-160 91t-60 189q0 103 65 180.5T440-202v80Zm80-438v-238q91 12 158 79t79 159H520Z"/></svg></span>
+        <span class="text-[11px] font-semibold">Resumen</span>
+      </button>
+      <div class="flex items-center justify-center">
+        <button id="btnFabAdd" type="button" aria-label="Nuevo movimiento"
+          class="fab-dock -mt-6 w-[52px] h-[52px] rounded-full text-white flex items-center justify-center transition ring-4 ring-[#f8f9fb]">
+          <span class="ms-icon text-[26px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg></span>
+        </button>
+      </div>
+      <button type="button" data-tab="Ahorro" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-600">
+        <span class="ms-icon text-[22px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M640-520q17 0 28.5-11.5T680-560q0-17-11.5-28.5T640-600q-17 0-28.5 11.5T600-560q0 17 11.5 28.5T640-520Zm-320-80h200v-80H320v80ZM180-120q-34-114-67-227.5T80-580q0-92 64-156t156-64h200q29-38 70.5-59t89.5-21q25 0 42.5 17.5T720-820q0 6-1.5 12t-3.5 11q-4 11-7.5 22.5T702-751l91 91h87v279l-113 37-67 224H480v-80h-80v80H180Zm60-80h80v-80h240v80h80l62-206 98-33v-141h-40L620-720q0-20 2.5-38.5T630-796q-29 8-51 27.5T547-720H300q-58 0-99 41t-41 99q0 98 27 191.5T240-200Z"/></svg></span>
+        <span class="text-[11px] font-semibold">Ahorro</span>
+      </button>
+      <button type="button" data-tab="Ajustes" class="nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-600">
+        <span class="ms-icon text-[22px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z"/></svg></span>
+        <span class="text-[11px] font-semibold">Ajustes</span>
+      </button>
+    </nav>
+
+    <!-- Bottom Sheet Modal: Planear Salida (Connected to finanzasOuting) -->
+    <dialog id="outingsModal" aria-labelledby="outingsModalTitle" class="sheet-dialog fixed inset-0 bg-transparent items-end justify-center">
+      <div class="sheet-slide bg-white w-full rounded-t-3xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
+
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 id="outingsModalTitle" class="text-base font-extrabold text-slate-900 inline-flex items-center gap-1.5"><span class="ms-icon text-[18px] text-[#0a6871]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m80-80 200-560 360 360L80-80Zm132-132 282-100-182-182-100 282Zm370-246-42-42 224-224q32-32 77-32t77 32l24 24-42 42-24-24q-14-14-35-14t-35 14L582-458ZM422-618l-42-42 24-24q14-14 14-34t-14-34l-26-26 42-42 26 26q32 32 32 76t-32 76l-24 24Zm80 80-42-42 144-144q14-14 14-35t-14-35l-64-64 42-42 64 64q32 32 32 77t-32 77L502-538Zm160 160-42-42 64-64q32-32 77-32t77 32l64 64-42 42-64-64q-14-14-35-14t-35 14l-64 64Z"/></svg></span><span>Planeo una salida</span></h3>
+            <p class="text-xs text-slate-500 mt-0.5">Reserva el doble de presupuesto para días de salida.</p>
+          </div>
+          <button id="btnCloseOutingsModal" type="button" aria-label="Cerrar" class="w-11 h-11 rounded-full bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition">
+            <span class="ms-icon text-[18px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></span>
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <p class="text-xs font-bold text-slate-700 mb-2">Días que se repiten cada semana</p>
+            <div class="grid grid-cols-7 gap-1.5">
+              <button type="button" data-outing-weekday="1" aria-label="lunes" aria-pressed="false" class="outing-day">Lun</button>
+              <button type="button" data-outing-weekday="2" aria-label="martes" aria-pressed="false" class="outing-day">Mar</button>
+              <button type="button" data-outing-weekday="3" aria-label="miércoles" aria-pressed="false" class="outing-day">Mié</button>
+              <button type="button" data-outing-weekday="4" aria-label="jueves" aria-pressed="false" class="outing-day">Jue</button>
+              <button type="button" data-outing-weekday="5" aria-label="viernes" aria-pressed="false" class="outing-day">Vie</button>
+              <button type="button" data-outing-weekday="6" aria-label="sábado" aria-pressed="false" class="outing-day">Sáb</button>
+              <button type="button" data-outing-weekday="0" aria-label="domingo" aria-pressed="false" class="outing-day">Dom</button>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100">
+            <label for="outingDate" class="block text-xs font-bold text-slate-700 mb-2">Cambiar una fecha puntual de este mes</label>
+            <div class="flex gap-2">
+              <input id="outingDate" type="date" class="min-w-0 grow rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-base focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#38D3E8]">
+              <button id="toggleOutingDate" type="button" class="rounded-xl bg-[#2B7C85] hover:bg-[#215368] px-4 py-2.5 text-xs font-bold text-white transition shrink-0">Marcar salida</button>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-xs font-bold text-slate-800 inline-flex items-center gap-1.5"><span class="ms-icon text-[16px] text-[#0a6871]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Z"/></svg></span><span>Sincronizar Google Calendar</span></p>
+              <p class="text-[11px] text-slate-500 leading-snug">Sube el presupuesto (x2) en cumpleaños, Navidad y fechas especiales.</p>
+            </div>
+            <button id="btnToggleCalSync" type="button" role="switch" aria-checked="true"
+              class="px-3 py-1.5 rounded-full text-xs font-bold transition shrink-0 bg-[#2B7C85] text-white">
+              Activo
+            </button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Bottom Sheet Modal: Nuevo Pago Fijo Automático -->
+    <dialog id="recurringModal" aria-labelledby="recModalTitle" class="sheet-dialog fixed inset-0 bg-transparent items-end justify-center">
+      <div class="sheet-slide bg-white w-full rounded-t-3xl p-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
+
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h3 id="recModalTitle" class="text-base font-extrabold text-slate-900 inline-flex items-center gap-1.5"><span class="ms-icon text-[18px] text-[#0a6871]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M280-80 120-240l160-160 56 58-62 62h406v-160h80v240H274l62 62-56 58Zm-80-440v-240h486l-62-62 56-58 160 160-160 160-56-58 62-62H280v160h-80Z"/></svg></span><span>Nuevo pago fijo</span></h3>
+            <p class="text-xs text-slate-500 mt-0.5">Se registrará automáticamente cada mes en su fecha.</p>
+          </div>
+          <button id="btnCloseRecModal" type="button" aria-label="Cerrar" class="w-11 h-11 rounded-full bg-slate-100 text-slate-600 hover:text-slate-900 flex items-center justify-center transition">
+            <span class="ms-icon text-[18px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></span>
+          </button>
+        </div>
+
+        <!-- Switch Gasto fijo vs Sueldo / Ingreso fijo -->
+        <div class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl mb-3">
+          <button id="recTypeExpense" type="button" class="py-2 rounded-xl text-xs font-bold bg-white text-[#9a3412] shadow-xs transition">Gasto fijo</button>
+          <button id="recTypeIncome" type="button" class="py-2 rounded-xl text-xs font-bold text-slate-500 transition">Sueldo / Ingreso</button>
+        </div>
+
+        <!-- Quick Presets (Separated cleanly by type, no duplicates) -->
+        <div id="recExpensePresets" class="flex flex-wrap gap-1.5 mb-3.5">
+          <button type="button" data-rec-preset="expense|Recibo móvil|Casa||15|0" class="rec-preset min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] text-[#191c1e] text-xs font-semibold">Plan móvil</button>
+          <button type="button" data-rec-preset="expense|Curso|Educación||5|6" class="rec-preset min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] text-[#191c1e] text-xs font-semibold">Curso (cuotas)</button>
+          <button type="button" data-rec-preset="expense|Internet|Casa||10|0" class="rec-preset min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] text-[#191c1e] text-xs font-semibold">Internet</button>
+          <button type="button" data-rec-preset="expense|Gimnasio|Salud||1|0" class="rec-preset min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] text-[#191c1e] text-xs font-semibold">Gym</button>
+        </div>
+        <div id="recIncomePresets" class="hidden flex-wrap gap-1.5 mb-3.5">
+          <button type="button" data-rec-preset="income|Sueldo mensual|Sueldo||31|0" class="rec-preset min-h-[40px] px-3.5 py-2 rounded-full bg-[#a3eff9]/50 text-[#003e51] text-xs font-semibold">Sueldo mensual</button>
+          <button type="button" data-rec-preset="income|Ingreso extra|Extra||15|0" class="rec-preset min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] text-[#191c1e] text-xs font-semibold">Ingreso extra</button>
+        </div>
+
+        <form id="recurringForm" class="space-y-3">
+          <input type="hidden" id="recEditId" value="" />
+          <input type="hidden" id="recEditStartMonth" value="" />
+          <div>
+            <label for="recConcept" class="block text-xs font-bold text-slate-700 mb-1">Nombre del pago o curso</label>
+            <input id="recConcept" type="text" maxlength="80" required placeholder="Ej. Recibo móvil, Curso de Python..."
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base focus:outline-none focus:ring-2 focus:ring-[#38D3E8]" />
+          </div>
+
+          <div>
+            <label for="recAmount" class="block text-xs font-bold text-slate-700 mb-1">Monto (<span class="currency-lbl">S/</span>)</label>
+            <input id="recAmount" inputmode="decimal" type="number" step="0.01" min="0.01" required placeholder="69.90"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-base font-extrabold text-[#9a3412] focus:outline-none focus:ring-2 focus:ring-[#F48C37]" />
+          </div>
+
+          <!-- Unified Schedule Selector (Gasto fijo & Sueldo/Ingreso) -->
+          <div class="space-y-2">
+            <span id="recScheduleTitle" class="block text-xs font-bold text-slate-700">¿Cuándo se registra cada mes?</span>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button id="btnSchedQuincena" type="button" data-sched="15"
+                class="sched-btn py-2.5 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 transition">
+                <span>Quincena</span>
+              </button>
+              <button id="btnSchedFinMes" type="button" data-sched="31"
+                class="sched-btn py-2.5 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 transition">
+                <span>Fin de mes</span>
+              </button>
+              <button id="btnSchedCustom" type="button" data-sched="custom"
+                class="sched-btn py-2.5 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1 transition">
+                <span>Día fijo</span>
+              </button>
+            </div>
+            <div id="recCustomDayWrap" class="hidden pt-0.5">
+              <div class="flex items-center gap-2">
+                <label for="recDay" class="text-xs font-semibold text-slate-500 shrink-0">Día del mes (1–31):</label>
+                <input id="recDay" type="number" min="1" max="31" required value="15"
+                  class="w-24 px-3 py-2 rounded-xl border border-slate-200 text-base font-bold focus:outline-none focus:ring-2 focus:ring-[#38D3E8]" />
+              </div>
+              <p class="text-[11px] text-slate-600 mt-1">Si eliges 29–31, en meses cortos usa el último día.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="recCategory" class="block text-xs font-bold text-slate-700 mb-1">Categoría</label>
+              <select id="recCategory" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-base bg-white focus:outline-none focus:ring-2 focus:ring-[#38D3E8]">
+                <option value="Casa">Vivienda y servicios</option>
+                <option value="Educación">Educación</option>
+                <option value="Entretenimiento">Salidas / Streaming</option>
+                <option value="Salud">Salud</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Comida">Comida</option>
+                <option value="Compras">Compras</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </div>
+            <div>
+              <label for="recPayment" class="block text-xs font-bold text-slate-700 mb-1">Método de pago</label>
+              <select id="recPayment" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-base bg-white focus:outline-none focus:ring-2 focus:ring-[#38D3E8]">
+                <option value="Tarjeta de débito">Débito</option>
+                <option value="Tarjeta de crédito">Crédito</option>
+                <option value="Yape/Plin">Yape / Plin</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Efectivo">Efectivo</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="recDurationBox" class="rounded-2xl bg-slate-50 border border-slate-200/80 p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-bold text-slate-700">Duración</span>
+              <div class="inline-flex bg-white p-0.5 rounded-xl border border-slate-200 text-[11px] font-bold">
+                <button id="recModeIndef" type="button" class="px-2.5 py-1 rounded-lg bg-[#2B7C85] text-white transition">Todos los meses</button>
+                <button id="recModeQuota" type="button" class="px-2.5 py-1 rounded-lg text-slate-500 transition">Por cuotas</button>
+              </div>
+            </div>
+            <div id="recQuotaWrap" class="hidden pt-1">
+              <label for="recInstallments" class="block text-[11px] font-semibold text-slate-500 mb-1">¿Cuántos meses dura? (ej. un curso de 3 o 6 meses)</label>
+              <input id="recInstallments" type="number" min="1" max="60" placeholder="6"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-base font-bold focus:outline-none focus:ring-2 focus:ring-[#38D3E8]" />
+            </div>
+          </div>
+
+          <!-- Scope Toggle (Visible when editing: Solo este mes vs Todos los meses) -->
+          <div id="recEditScopeWrap" class="hidden rounded-2xl bg-[#F6F8FA] border border-slate-200/80 p-3 space-y-2">
+            <span class="block text-xs font-bold text-slate-700">¿A qué meses aplica este cambio?</span>
+            <div class="grid grid-cols-2 gap-1.5">
+              <button id="btnRecScopeMonth" type="button" class="py-2 px-2 rounded-xl border border-[#2B7C85] bg-[#E4F9FD] text-[#215368] text-xs font-extrabold transition">
+                Solo este mes
+              </button>
+              <button id="btnRecScopeAll" type="button" class="py-2 px-2 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs font-bold transition">
+                Todos los meses
+              </button>
+            </div>
+            <p id="recScopeHint" class="text-[11px] text-slate-500 leading-snug">El próximo mes volverá automáticamente a su monto normal.</p>
+          </div>
+
+          <button id="btnSaveRec" type="submit"
+            class="w-full py-3 rounded-2xl bg-[#2B7C85] hover:bg-[#215368] text-white font-bold text-sm transition shadow-md">
+            Activar cobro automático
+          </button>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Bottom Sheet Modal: Quick Add / Edit Transaction (Decluttered UX/UI) -->
+    <dialog id="txModal" aria-labelledby="txModalTitle" class="sheet-dialog fixed inset-0 bg-transparent items-end justify-center">
+      <div class="sheet-slide bg-white w-full rounded-t-3xl p-5 shadow-2xl max-h-[88vh] overflow-y-auto">
+        <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3.5"></div>
+
+        <div class="flex items-center justify-between mb-3.5">
+          <h3 id="txModalTitle" class="text-base font-extrabold text-[#191c1e]">Nuevo movimiento</h3>
+          <button id="btnCloseTxModal" type="button" aria-label="Cerrar" class="w-11 h-11 rounded-full bg-[#f2f4f6] text-[#40484c] flex items-center justify-center hover:bg-slate-200 transition">
+            <span class="ms-icon text-[18px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></span>
+          </button>
+        </div>
+
+        <!-- 3-Way Segmented Switch -->
+        <div class="grid grid-cols-3 gap-1 bg-[#f2f4f6] p-1 rounded-2xl mb-4">
+          <button id="typeExpenseBtn" type="button" class="py-2 rounded-xl text-xs font-bold bg-white text-[#7e3e00] shadow-xs transition">Gasto</button>
+          <button id="typeIncomeBtn" type="button" class="py-2 rounded-xl text-xs font-bold text-[#525a5e] transition">Ingreso</button>
+          <button id="typeSavingBtn" type="button" class="py-2 rounded-xl text-xs font-bold text-[#525a5e] transition">Ahorro</button>
+        </div>
+
+        <form id="txForm" class="space-y-3.5">
+          <input type="hidden" id="txEditId" value="" />
+
+          <!-- Prominent Hero Amount Input (Fintech Standard) -->
+          <div class="rounded-2xl bg-[#f8f9fb] border border-slate-200/80 px-4 py-3 text-center focus-within:ring-2 focus-within:ring-[#0a6871]/40 focus-within:border-[#0a6871] focus-within:bg-white transition">
+            <label for="txAmount" class="block text-[11px] font-bold uppercase tracking-wider text-[#525a5e]">Monto (<span class="currency-lbl">S/</span>)</label>
+            <input id="txAmount" inputmode="decimal" type="number" step="0.01" min="0.01" required placeholder="0.00"
+              class="w-full mt-0.5 bg-transparent text-center text-3xl font-extrabold text-[#003e51] placeholder:text-slate-300 focus:outline-none" />
+          </div>
+
+          <!-- Clean Text-Only Quick Chips (NO preset amount, NO emojis) -->
+          <div id="quickChipsWrap" class="flex flex-wrap gap-1.5">
+            <button type="button" data-quick="Almuerzo|Comida" class="quick-chip min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] hover:bg-[#a3eff9]/50 text-[#191c1e] text-xs font-semibold transition">Almuerzo</button>
+            <button type="button" data-quick="Café|Comida" class="quick-chip min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] hover:bg-[#a3eff9]/50 text-[#191c1e] text-xs font-semibold transition">Café</button>
+            <button type="button" data-quick="Transporte|Transporte" class="quick-chip min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] hover:bg-[#a3eff9]/50 text-[#191c1e] text-xs font-semibold transition">Taxi</button>
+            <button type="button" data-quick="Supermercado|Compras" class="quick-chip min-h-[40px] px-3.5 py-2 rounded-full bg-[#f2f4f6] hover:bg-[#a3eff9]/50 text-[#191c1e] text-xs font-semibold transition">Súper</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="txConcept" class="block text-[11px] font-bold text-[#40484c] mb-1">Concepto</label>
+              <input id="txConcept" type="text" maxlength="100" placeholder="Opcional..."
+                class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-[#f8f9fb] focus:bg-white text-base focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30" />
+            </div>
+            <div>
+              <label for="txDate" class="block text-[11px] font-bold text-[#40484c] mb-1">Fecha</label>
+              <input id="txDate" type="date" required
+                class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-[#f8f9fb] focus:bg-white text-base focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="txCategory" class="block text-[11px] font-bold text-[#40484c] mb-1">Categoría</label>
+              <select id="txCategory" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-[#f8f9fb] focus:bg-white text-base focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30"></select>
+            </div>
+            <div>
+              <label for="txPayment" class="block text-[11px] font-bold text-[#40484c] mb-1">Método de pago</label>
+              <select id="txPayment" class="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-[#f8f9fb] focus:bg-white text-base focus:outline-none focus:ring-2 focus:ring-[#0a6871]/30">
+                <option value="">Sin indicar</option>
+                <option value="Yape/Plin">Yape / Plin</option>
+                <option value="Efectivo">Efectivo</option>
+                <option value="Tarjeta de débito">Débito</option>
+                <option value="Tarjeta de crédito">Crédito</option>
+                <option value="Transferencia">Transferencia</option>
+              </select>
+            </div>
+          </div>
+
+          <p id="txError" role="alert" class="text-xs text-rose-700"></p>
+          <button id="btnSaveTx" type="submit"
+            class="w-full py-3 rounded-2xl bg-[#003e51] hover:bg-[#1f566a] text-white font-bold text-sm transition shadow-sm">
+            Guardar gasto
+          </button>
+        </form>
+      </div>
+    </dialog>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="hidden fixed sm:absolute inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-5">
+      <div class="bg-white rounded-3xl p-5 w-full max-w-xs shadow-xl">
+        <h3 id="confirmTitle" class="text-base font-extrabold text-slate-900">¿Confirmar?</h3>
+        <p id="confirmMsg" class="text-xs text-slate-500 mt-1.5 mb-4"></p>
+        <div class="flex gap-2">
+          <button id="btnConfirmCancel" type="button" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">Cancelar</button>
+          <button id="btnConfirmOk" type="button" class="flex-1 py-2.5 rounded-xl bg-rose-600 text-white text-xs font-bold">Confirmar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toastWrap" role="status" aria-live="polite" aria-atomic="true" class="fixed sm:absolute top-4 inset-x-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  </div>
+
+  <script>
+    (function () {
+      const PRIVACY_KEY = 'mis-finanzas:ocultar-saldo';
+      const MS_PATHS = {"person": "M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Z", "chevron_left": "M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z", "chevron_right": "M504-480 320-664l56-56 240 240-240 240-56-56 184-184Z", "visibility": "M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-80q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z", "visibility_off": "m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Z", "celebration": "m80-80 200-560 360 360L80-80Zm132-132 282-100-182-182-100 282Zm370-246-42-42 224-224q32-32 77-32t77 32l24 24-42 42-24-24q-14-14-35-14t-35 14L582-458ZM422-618l-42-42 24-24q14-14 14-35t-14-35l-24-24 42-42 24 24q32 32 32 77t-32 77l-24 24Zm80 80-42-42 144-144q14-14 14-35t-14-35l-64-64 42-42 64 64q32 32 32 77t-32 77L502-538Zm160 160-42-42 64-64q32-32 77-32t77 32l64 64-42 42-64-64q-14-14-35-14t-35 14l-64 64Z", "home": "M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Z", "pie_chart": "M440-122q-121-15-200.5-105.5T160-440q0-134 93-227t227-93v320h320q0 121-79.5 212.5T520-122v-80q88-14 144-79.5T720-440H440v-280q-100 14-160 91t-60 189q0 103 65 180.5T440-202v80Zm80-438v-238q91 12 158 79t79 159H520Z", "add": "M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z", "savings": "M640-520q17 0 28.5-11.5T680-560q0-17-11.5-28.5T640-600q-17 0-28.5 11.5T600-560q0 17 11.5 28.5T640-520Zm-320-80h200v-80H320v80ZM180-120q-34-114-67-227.5T80-580q0-92 64-156t156-64h200q29-38 70.5-59t89.5-21q25 0 42.5 17.5T720-820q0 6-1.5 12t-3.5 11q-4 11-7.5 22.5T702-751l91 91h87v279l-113 37-67 224H480v-80h-80v80H180Zm60-80h80v-80h240v80h80l62-206 98-33v-141h-40L620-720q0-20 2.5-38.5T630-796q-29 8-51 27.5T547-720H300q-58 0-99 41t-41 99q0 98 27 191.5T240-200Z", "settings": "m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Z", "local_fire_department": "M240-400q0 52 21 98.5t60 81.5q-1-5-1-9v-9q0-32 12-60t35-51l113-111 113 111q23 23 35 51t12 60v9q0 4-1 9 39-35 60-81.5t21-98.5q0-50-18.5-94.5T648-574q-20 13-42 19.5t-45 6.5q-62 0-107.5-41T401-690q-39 33-69 68.5t-50.5 72Q261-513 250.5-475T240-400Zm240 52-57 56q-11 11-17 25t-6 29q0 32 23.5 55t56.5 23q33 0 56.5-23t23.5-55q0-16-6-29.5T537-292l-57-56Zm0-492v132q0 34 23.5 57t57.5 23q18 0 33.5-7.5T622-658l18-22q74 42 117 117t43 163q0 134-93 227T480-80q-134 0-227-93t-93-227q0-129 86.5-245T480-840Z", "download": "M480-320 280-520l56-58 104 104v-326h80v326l104-104 56 58-200 200ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z", "close": "m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z", "shopping_bag": "M240-80q-33 0-56.5-23.5T160-160v-480q0-33 23.5-56.5T240-720h80q0-66 47-113t113-47q66 0 113 47t47 113h80q33 0 56.5 23.5T800-640v480q0 33-23.5 56.5T720-80H240Zm0-80h480v-480h-80v80q0 17-11.5 28.5T600-520q-17 0-28.5-11.5T560-560v-80H400v80q0 17-11.5 28.5T360-520q-17 0-28.5-11.5T320-560v-80h-80v480Zm160-560h160q0-33-23.5-56.5T480-800q-33 0-56.5 23.5T400-720Z", "payments": "M560-440q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM280-320q-33 0-56.5-23.5T200-400v-320q0-33 23.5-56.5T280-800h560q33 0 56.5 23.5T920-720v320q0 33-23.5 56.5T840-320H280Zm80-80h400q0-33 23.5-56.5T840-480v-160q-33 0-56.5-23.5T760-720H360q0 33-23.5 56.5T280-640v160q33 0 56.5 23.5T360-400Zm440 240H120q-33 0-56.5-23.5T40-240v-440h80v440h680v80Z", "local_cafe": "M160-120v-80h640v80H160Zm160-160q-66 0-113-47t-47-113v-400h640q33 0 56.5 23.5T880-760v120q0 33-23.5 56.5T800-560h-80v120q0 66-47 113t-113 47H320Zm0-80h240q33 0 56.5-23.5T640-440v-320H240v320q0 33 23.5 56.5T320-360Zm400-280h80v-120h-80v120Z", "directions_car": "M240-200v40q0 17-11.5 28.5T200-120h-40q-17 0-28.5-11.5T120-160v-320l84-240q6-18 21.5-29t34.5-11h440q19 0 34.5 11t21.5 29l84 240v320q0 17-11.5 28.5T800-120h-40q-17 0-28.5-11.5T720-160v-40H240Zm-8-360h496l-42-120H274l-42 120Zm-32 80v200-200Zm100 160q25 0 42.5-17.5T360-380q0-25-17.5-42.5T300-440q-25 0-42.5 17.5T240-380q0 25 17.5 42.5T300-320Zm360 0q25 0 42.5-17.5T720-380q0-25-17.5-42.5T660-440q-25 0-42.5 17.5T600-380q0 25 17.5 42.5T660-320Zm-460 40h560v-200H200v200Z", "fitness_center": "m826-585-56-56 30-31-128-128-31 30-57-57 30-31q23-23 57-22.5t57 23.5l129 129q23 23 23 56.5T857-615l-31 30ZM346-104q-23 23-56.5 23T233-104L104-233q-23-23-23-56.5t23-56.5l30-30 57 57-31 30 129 129 30-31 57 57-30 30Zm397-336 57-57-303-303-57 57 303 303ZM463-160l57-58-302-302-58 57 303 303Zm-6-234 110-109-64-64-109 110 63 63Z", "school": "M480-120 200-272v-240L40-600l440-240 440 240v320h-80v-276l-80 44v240L480-120Zm0-332 274-148-274-148-274 148 274 148Zm0 241 200-108v-151L480-360 280-470v151l200 108Z", "category": "m260-520 220-360 220 360H260ZM700-80q-75 0-127.5-52.5T520-260q0-75 52.5-127.5T700-440q75 0 127.5 52.5T880-260q0 75-52.5 127.5T700-80Zm-580-20v-320h320v320H120Zm580-60q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29Zm-500-20h160v-160H200v160Zm202-420h156l-78-126-78 126Z", "edit": "M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z", "delete": "M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360Z", "pause": "M520-200v-560h240v560H520Zm-320 0v-560h240v560H200Zm400-80h80v-400h-80v400Zm-320 0h80v-400h-80v400Z", "play_arrow": "M320-200v-560l440 280-440 280Zm80-280Zm0 134 210-134-210-134v268Z", "restaurant": "M280-80v-366q-51-14-85.5-56T160-600v-280h80v280h40v-280h80v280h40v-280h80v280q0 56-34.5 98T360-446v366h-80Zm400 0v-320H560v-280q0-83 58.5-141.5T760-880v800h-80Z", "wifi": "M480-120q-42 0-71-29t-29-71q0-42 29-71t71-29q42 0 71 29t29 71q0 42-29 71t-71 29ZM254-346l-84-86q59-59 138.5-93.5T480-560q92 0 171.5 35T790-430l-84 84q-44-44-102-69t-124-25q-66 0-124 25t-102 69ZM84-516 0-600q92-94 215-147t265-53q142 0 265 53t215 147l-84 84q-77-77-178.5-120.5T480-680q-116 0-217.5 43.5T84-516Z", "movie": "m160-800 80 160h120l-80-160h80l80 160h120l-80-160h80l80 160h120l-80-160h120q33 0 56.5 23.5T880-720v480q0 33-23.5 56.5T800-160H160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800Zm0 240v320h640v-320H160Z", "redeem": "M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h164q-4-11-6-22t-2-23q0-46 31.5-77.5T425-954q29 0 55 15.5t40 41.5q14-26 40-41.5t55-15.5q46 0 77.5 31.5T724-845q0 12-2 23t-6 22h164q33 0 56.5 23.5T960-720v480q0 33-23.5 56.5T880-160H160Zm0-80h640v-80H160v80Zm0-160h640v-240H598l82 112-64 48-136-184-136 184-64-48 82-112H160v240Z", "work": "M160-120q-33 0-56.5-23.5T80-200v-440q0-33 23.5-56.5T160-720h160v-80q0-33 23.5-56.5T400-880h160q33 0 56.5 23.5T640-800v80h160q33 0 56.5 23.5T880-640v440q0 33-23.5 56.5T800-120H160Zm0-80h640v-440H160v440Zm240-520h160v-80H400v80Z", "trending_up": "m136-240-56-56 296-298 160 160 208-206H640v-80h240v240h-80v-104L536-320 376-480 136-240Z", "account_balance": "M200-280v-280h80v280h-80Zm240 0v-280h80v280h-80ZM80-120v-80h800v80H80Zm600-160v-280h80v280h-80ZM80-640v-80l400-200 400 200v80H80Zm178-80h444-444Zm0 0h444L480-830 258-720Z", "shield": "M480-80q-139-35-229.5-159.5T160-516v-244l320-120 320 120v244q0 152-90.5 276.5T480-80Zm0-84q104-33 172-132t68-220v-189l-240-90-240 90v189q0 121 68 220t172 132Z", "flight": "M280-80v-100l120-84v-144L80-280v-120l320-224v-176q0-33 23.5-56.5T480-880q33 0 56.5 23.5T560-800v176l320 224v120L560-408v144l120 84v100l-200-60-200 60Z", "star": "m354-287 126-76 126 77-33-144 111-96-146-13-58-136-58 135-146 13 111 97-33 143ZM233-120l65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Z"};
+      const msSvg = (name, cls = 'text-[18px]') => `<span class="ms-icon ${cls}"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="${MS_PATHS[name] || MS_PATHS.category}"/></svg></span>`;
+
+      const EXPENSE_CATS = [
+        { id: 'Comida', label: 'Comida', icon: 'local_cafe', color: '#F48C37', bg: 'bg-orange-50 text-[#7e3e00]' },
+        { id: 'Casa', label: 'Vivienda y servicios', icon: 'home', color: '#2B7C85', bg: 'bg-[#E4F9FD] text-[#003e51]' },
+        { id: 'Compras', label: 'Supermercado', icon: 'shopping_bag', color: '#38D3E8', bg: 'bg-sky-50 text-[#003e51]' },
+        { id: 'Transporte', label: 'Transporte', icon: 'directions_car', color: '#4D7E87', bg: 'bg-slate-100 text-[#1f566a]' },
+        { id: 'Entretenimiento', label: 'Salidas', icon: 'celebration', color: '#F59E0B', bg: 'bg-amber-50 text-[#7e3e00]' },
+        { id: 'Salud', label: 'Salud', icon: 'fitness_center', color: '#10B981', bg: 'bg-emerald-50 text-emerald-800' },
+        { id: 'Educación', label: 'Educación', icon: 'school', color: '#7c3aed', bg: 'bg-violet-50 text-violet-800' },
+        { id: 'Otros', label: 'Otros', icon: 'category', color: '#64748B', bg: 'bg-slate-100 text-slate-600' }
+      ];
+
+      const INCOME_CATS = [
+        { id: 'Sueldo', label: 'Sueldo', icon: 'payments', color: '#0a6871', bg: 'bg-[#a3eff9]/55 text-[#004f56]' },
+        { id: 'Extra', label: 'Extra / Freelance', icon: 'payments', color: '#38D3E8', bg: 'bg-[#E4F9FD] text-[#003e51]' },
+        { id: 'Reembolso', label: 'Otros ingresos', icon: 'payments', color: '#10B981', bg: 'bg-emerald-50 text-emerald-800' }
+      ];
+
+      const MONTHS = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      ];
+      const WEEKDAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+      const today = getTodayIso();
+      let state = {
+        selectedYear: Number(today.slice(0, 4)),
+        selectedMonth: Number(today.slice(5, 7)) - 1,
+        settings: { currency: 'S/', baseIncome: 0, maxCap: 0, alertThreshold: 80, savingsGoal: 0 },
+        transactions: [],
+        outings: { weekly: [], overrides: {} },
+        recurring: [],
+        calendarSync: false,
+        specialDays: {}
+      };
+      let activeTab = 'Inicio';
+      let hideAmounts = false;
+      try { hideAmounts = localStorage.getItem(PRIVACY_KEY) === 'true'; } catch (_) {}
+      let formType = 'expense';
+      let catChart = null;
+      let dailyChart = null;
+      let confirmCb = null;
+      let pending = false;
+      let ready = false;
+      let intent;
+      const status = document.getElementById('sheetStatus');
+      const syncDot = document.getElementById('syncDot');
+      const retry = document.getElementById('reloadMonth');
+      const controls = ['btnPrevMonth', 'btnNextMonth', 'btnFabAdd', 'btnApply20Rule', 'btnSaveTx', 'btnOpenOutings', 'btnAddRecurring', 'btnSaveRec', 'btnQuickSaveGoal'];
+      const monthKey = () => `${state.selectedYear}-${String(state.selectedMonth + 1).padStart(2, '0')}`;
+
+      const setControls = () => {
+        for (const id of controls) {
+          const control = document.getElementById(id);
+          if (control) control.disabled = pending || !ready;
+        }
+        document.querySelector('#settingsForm button[type="submit"]').disabled = pending || !ready;
+      };
+
+      const hasAppsScript = () => typeof google !== 'undefined' && google.script && google.script.run;
+
+      function runPreviewFallback(method, args, success) {
+        ready = true;
+        pending = false;
+        status.dataset.error = 'false';
+        status.textContent = 'Vista previa';
+        syncDot.className = 'w-1.5 h-1.5 rounded-full bg-[#45E1F1]';
+        setControls();
+        if (method === 'finanzasMonth') {
+          const m = args[0] || monthKey();
+          const demo = {
+            month: m,
+            settings: state.settings.maxCap ? state.settings : { currency: 'S/', baseIncome: 3200, maxCap: 0, alertThreshold: 80, savingsGoal: 0 },
+            transactions: state.transactions.length ? state.transactions : [
+              { id: 'demo-2', date: m + '-05', type: 'expense', concept: 'Supermercado', category: 'Compras', payment: 'Tarjeta de débito', amount: 240 },
+              { id: 'demo-3', date: getTodayIso(), type: 'expense', concept: 'Almuerzo', category: 'Comida', payment: 'Yape/Plin', amount: 25 }
+            ],
+            outings: state.outings,
+            recurring: state.recurring.length ? state.recurring : [
+              { id: 'r0', type: 'income', concept: 'Sueldo mensual', amount: 3200, dayOfMonth: 31, category: 'Sueldo', payment: 'Transferencia', totalInstallments: 0, startMonth: m, active: true },
+              { id: 'r1', type: 'expense', concept: 'Recibo móvil', amount: 69.90, dayOfMonth: 15, category: 'Casa', payment: 'Tarjeta de débito', totalInstallments: 0, startMonth: m, active: true },
+              { id: 'r2', type: 'expense', concept: 'Curso de Python & IA', amount: 180, dayOfMonth: 25, category: 'Educación', payment: 'Tarjeta de crédito', totalInstallments: 6, startMonth: m, active: true }
+            ],
+            calendarSync: state.calendarSync,
+            specialDays: state.calendarSync ? { [m + '-26']: { title: 'Cumpleaños de mi amorcito', source: 'calendar' } } : {}
+          };
+          success(demo);
+        } else if (method === 'finanzasSave') {
+          const [tx, edit] = args;
+          if (edit) {
+            const idx = state.transactions.findIndex(t => t.id === tx.id);
+            if (idx !== -1) state.transactions[idx] = tx;
+          } else {
+            state.transactions.push(tx);
+          }
+          success({ month: (tx.date || monthKey()).slice(0, 7), settings: state.settings, transactions: state.transactions, outings: state.outings });
+        } else if (method === 'finanzasDelete') {
+          state.transactions = state.transactions.filter(t => t.id !== args[0]);
+          success({ month: args[1] || monthKey(), settings: state.settings, transactions: state.transactions, outings: state.outings });
+        } else if (method === 'finanzasSettings') {
+          const s = args[0];
+          state.settings = { currency: s.currency, baseIncome: s.baseIncome, maxCap: s.maxCap, alertThreshold: s.alertThreshold, savingsGoal: s.savingsGoal };
+          success({ month: s.month || monthKey(), settings: state.settings, transactions: state.transactions, outings: state.outings });
+        } else if (method === 'finanzasOuting') {
+          const [m, kind, key, enabled] = args;
+          if (kind === 'weekly') {
+            const set = new Set(state.outings.weekly);
+            if (enabled) set.add(key); else set.delete(key);
+            state.outings.weekly = [...set].sort();
+          } else if (kind === 'date') {
+            state.outings.overrides[key] = enabled;
+          }
+          success({ month: m || monthKey(), settings: state.settings, transactions: state.transactions, outings: state.outings, recurring: state.recurring });
+        } else if (method === 'finanzasSaveRecurring') {
+          const [item, m] = args;
+          const mVal = m || monthKey();
+          const idx = item.id ? state.recurring.findIndex(r => r.id === item.id) : -1;
+          const prev = idx !== -1 ? state.recurring[idx] : null;
+          const overrides = prev && prev.monthOverrides ? { ...prev.monthOverrides } : {};
+          let entry;
+          if (prev && item.onlyThisMonth) {
+            overrides[mVal] = item.amount;
+            entry = { ...prev, monthOverrides: overrides };
+          } else {
+            delete overrides[mVal];
+            entry = { ...item, id: prev ? prev.id : ('r' + Date.now().toString(36)), startMonth: item.startMonth || mVal, active: prev ? prev.active : true, monthOverrides: overrides };
+          }
+          if (idx !== -1) state.recurring[idx] = entry;
+          else state.recurring.push(entry);
+          const recTxId = 'rec-' + entry.id + '-' + mVal;
+          const txIdx = state.transactions.findIndex(t => t.id === recTxId);
+          const [py, pm] = mVal.split('-').map(Number);
+          const maxD = new Date(py, pm, 0).getDate();
+          const chargeD = Math.min(Math.max(1, Number(entry.dayOfMonth) || 1), maxD);
+          const todayDay = Number(getTodayIso().slice(8, 10));
+          const rType = entry.type === 'income' ? 'income' : 'expense';
+          const effAmt = entry.monthOverrides && Number(entry.monthOverrides[mVal]) > 0 ? Number(entry.monthOverrides[mVal]) : entry.amount;
+          if (txIdx !== -1) {
+            state.transactions[txIdx] = { ...state.transactions[txIdx], type: rType, date: mVal + '-' + String(chargeD).padStart(2, '0'), concept: entry.concept, category: entry.category, payment: entry.payment, amount: effAmt };
+          } else if (entry.active !== false && chargeD <= todayDay) {
+            state.transactions.push({ id: recTxId, date: mVal + '-' + String(chargeD).padStart(2, '0'), type: rType, concept: entry.concept, category: entry.category, payment: entry.payment, amount: effAmt });
+          }
+          success({ month: mVal, settings: state.settings, transactions: state.transactions, outings: state.outings, recurring: state.recurring });
+        } else if (method === 'finanzasToggleRecurring') {
+          const [id, active, m] = args;
+          state.recurring = state.recurring.map(r => r.id === id ? { ...r, active } : r);
+          success({ month: m || monthKey(), settings: state.settings, transactions: state.transactions, outings: state.outings, recurring: state.recurring });
+        } else if (method === 'finanzasDeleteRecurring') {
+          const [id, m] = args;
+          state.recurring = state.recurring.filter(r => r.id !== id);
+          success({ month: m || monthKey(), settings: state.settings, transactions: state.transactions, outings: state.outings, recurring: state.recurring, calendarSync: state.calendarSync, specialDays: state.specialDays });
+        } else if (method === 'finanzasToggleCalendarSync') {
+          const [enabled, m] = args;
+          const mVal = m || monthKey();
+          state.calendarSync = Boolean(enabled);
+          state.specialDays = state.calendarSync ? { [mVal + '-26']: { title: 'Cumpleaños de mi amorcito', source: 'calendar' } } : {};
+          success({ month: mVal, settings: state.settings, transactions: state.transactions, outings: state.outings, recurring: state.recurring, calendarSync: state.calendarSync, specialDays: state.specialDays });
+        }
+      }
+
+      const API_URL = "https://script.google.com/macros/s/AKfycbyf937_iA6Gi6_6bg7-jO3dxqlzhRvbnMygC0HP4PkAb5FvSd8RtDM5lFBCmUfoYU2EdQ/exec";
+      const TOKEN_KEY = 'mis-finanzas:pwa-token';
+      let pwaToken = '';
+      try { pwaToken = localStorage.getItem(TOKEN_KEY) || ''; } catch (_) {}
+      const login = document.getElementById('pwaLogin');
+      const tokenField = document.getElementById('pwaToken');
+      const loginError = document.getElementById('pwaLoginError');
+      const appShell = document.querySelector('.app-shell');
+      function showPwaLogin(message = '') {
+        pwaToken = '';
+        try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
+        appShell.hidden = true;
+        login.hidden = false;
+        tokenField.value = '';
+        loginError.textContent = message;
+        tokenField.focus();
+      }
+      document.getElementById('pwaTokenSettings').addEventListener('click', () => {
+        try { localStorage.removeItem(TOKEN_KEY); } catch (_) {}
+        location.reload();
+      });
+      document.getElementById('pwaLoginForm').addEventListener('submit', event => {
+        event.preventDefault();
+        const token = tokenField.value.trim();
+        if (!/^[A-Za-z0-9_-]{24}$/.test(token)) {
+          loginError.textContent = 'Ingresa un token válido de 24 caracteres.';
+          return;
+        }
+        pwaToken = token;
+        try { localStorage.setItem(TOKEN_KEY, token); } catch (_) {}
+        tokenField.value = '';
+        login.hidden = true;
+        appShell.hidden = false;
+        loadMonth();
+      });
+
+      function callServer(method, args, success, failure) {
+        if (pending) return;
+        if (!hasAppsScript() && !pwaToken) {
+          showPwaLogin();
+          return;
+        }
+        pending = true;
+        retry.hidden = true;
+        status.dataset.error = 'false';
+        status.textContent = 'Sincronizando…';
+        syncDot.className = 'w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse';
+        setControls();
+        const onSuccess = data => {
+          pending = false;
+          ready = true;
+          status.textContent = 'Sincronizado';
+          syncDot.className = 'w-1.5 h-1.5 rounded-full bg-[#45E1F1]';
+          setControls();
+          success(data);
+        };
+        const onFailure = error => {
+          pending = false;
+          status.dataset.error = 'true';
+          status.textContent = error?.message || 'Error al conectar con Google Sheets.';
+          syncDot.className = 'w-1.5 h-1.5 rounded-full bg-rose-400';
+          retry.hidden = false;
+          setControls();
+          if (!hasAppsScript() && status.textContent === 'No autorizado') {
+            ready = false;
+            showPwaLogin('El token no es válido. Vuelve a pegarlo.');
+          }
+          if (failure) failure(status.textContent);
+        };
+        if (hasAppsScript()) {
+          try {
+            google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure)[method](...args);
+          } catch (error) { onFailure(error); }
+          return;
+        }
+        fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ token: pwaToken, action: method, args }),
+          redirect: 'follow',
+          cache: 'no-store',
+          credentials: 'omit'
+        }).then(async response => {
+          if (!response.ok) throw new Error('Error al conectar con Google Sheets.');
+          const result = await response.json();
+          if (result.ok !== true) throw new Error(result.error || 'La operación no se completó.');
+          return result.data;
+        }).then(onSuccess, onFailure);
+      }
+
+      const CACHE_PREFIX = 'mis-finanzas:cache:';
+
+      function readCache(month) {
+        if (!hasAppsScript()) return null;
+        try {
+          const raw = localStorage.getItem(CACHE_PREFIX + month);
+          return raw ? JSON.parse(raw) : null;
+        } catch (_) { return null; }
+      }
+
+      function writeCache(data) {
+        if (!hasAppsScript()) return;
+        if (!data || !data.month) return;
+        try { localStorage.setItem(CACHE_PREFIX + data.month, JSON.stringify(data)); } catch (_) {}
+      }
+
+      function applyMonth(data, fromCache = false) {
+        state.selectedYear = Number(data.month.slice(0, 4));
+        state.selectedMonth = Number(data.month.slice(5, 7)) - 1;
+        state.settings = data.settings;
+        state.transactions = data.transactions;
+        state.outings = data.outings || { weekly: [], overrides: {} };
+        if (Array.isArray(data.recurring)) state.recurring = data.recurring;
+        if (typeof data.calendarSync === 'boolean') state.calendarSync = data.calendarSync;
+        if (data.specialDays && typeof data.specialDays === 'object') state.specialDays = data.specialDays;
+        if (data.sheetUrl) {
+          const sl = document.getElementById('sheetLinkBtn');
+          if (sl) { sl.href = data.sheetUrl; sl.hidden = false; }
+        }
+        if (!fromCache) writeCache(data);
+        populateSettingsForm();
+        render();
+      }
+
+      function loadMonth(month = monthKey()) {
+        const cached = readCache(month);
+        if (cached) {
+          ready = true;
+          applyMonth(cached, true);
+        }
+        callServer('finanzasMonth', [month], data => applyMonth(data, false));
+      }
+
+      function shiftMonth(delta) {
+        const date = new Date(state.selectedYear, state.selectedMonth + delta, 1);
+        loadMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+      }
+
+      function updateSettings(settings, message) {
+        callServer('finanzasSettings', [{ ...settings, month: monthKey() }], data => {
+          applyMonth(data);
+          showToast(message);
+        });
+      }
+
+      function fmtMoney(v, compact = false) {
+        if (hideAmounts) return '••••';
+        const n = Number(v) || 0;
+        const sign = n < 0 ? '-' : '';
+        if (compact) {
+          return `${sign}${state.settings.currency} ${Math.abs(n).toLocaleString('es-PE', { maximumFractionDigits: 0 })}`;
+        }
+        return `${sign}${state.settings.currency} ${Math.abs(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      }
+
+      function fmtShortDate(iso) {
+        const p = (iso || '').split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : iso;
+      }
+
+      function getCatMeta(id, type) {
+        const list = type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+        return list.find(c => c.id === id) || { id, label: id || (type === 'saving' ? 'Ahorro' : 'Otros'), icon: type === 'saving' ? 'savings' : 'category', color: '#64748B', bg: type === 'saving' ? 'bg-[#ffdcc6]/65 text-[#7e3e00]' : 'bg-slate-100 text-slate-600' };
+      }
+
+      function getTodayIso() {
+        const fields = new Intl.DateTimeFormat('en', { timeZone: 'America/Lima', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+        return ['year', 'month', 'day'].map(type => fields.find(field => field.type === type).value).join('-');
+      }
+
+      function getDefaultDate() {
+        const day = getTodayIso();
+        return day.startsWith(monthKey()) ? day : monthKey() + '-01';
+      }
+
+      function getMonthTx() {
+        const prefix = `${state.selectedYear}-${String(state.selectedMonth + 1).padStart(2, '0')}`;
+        return state.transactions
+          .filter(t => t.date && t.date.startsWith(prefix))
+          .sort((a, b) => b.date.localeCompare(a.date));
+      }
+
+      function showToast(msg, tone = 'info') {
+        const wrap = document.getElementById('toastWrap');
+        const el = document.createElement('div');
+        const styles = {
+          info: 'bg-[#215368] text-white',
+          warn: 'bg-[#c2410c] text-white',
+          danger: 'bg-rose-600 text-white'
+        };
+        el.className = `pointer-events-auto px-4 py-2.5 rounded-2xl shadow-lg text-xs font-bold text-center ${styles[tone] || styles.info}`;
+        el.textContent = msg;
+        wrap.appendChild(el);
+        setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.transition = 'opacity 0.25s ease';
+          setTimeout(() => el.remove(), 260);
+        }, 3000);
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function switchTab(tabName) {
+        activeTab = tabName;
+        ['Inicio', 'Resumen', 'Ahorro', 'Ajustes'].forEach(t => {
+          const panel = document.getElementById(`tab${t}`);
+          const isTarget = t === tabName;
+          panel.classList.toggle('hidden', !isTarget);
+          panel.classList.remove('tab-enter');
+          if (isTarget) {
+            void panel.offsetWidth;
+            panel.classList.add('tab-enter');
+          }
+        });
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          const isActive = btn.getAttribute('data-tab') === tabName;
+          btn.className = isActive
+            ? 'nav-btn flex flex-col items-center justify-center gap-0.5 text-[#2B7C85]'
+            : 'nav-btn flex flex-col items-center justify-center gap-0.5 text-slate-600';
+          if (isActive) btn.setAttribute('aria-current', 'page');
+          else btn.removeAttribute('aria-current');
+          const lbl = btn.querySelector('span:last-child');
+          if (lbl) lbl.className = isActive ? 'text-[11px] font-bold' : 'text-[11px] font-semibold';
+        });
+        document.getElementById('mainScroll').scrollTop = 0;
+        if (tabName === 'Inicio') replayHeroAnim();
+        if (tabName === 'Resumen') renderCharts();
+        if (tabName === 'Ajustes') populateSettingsForm();
+      }
+
+      function replayHeroAnim() {
+        const svg = document.getElementById('heroIllus');
+        if (!svg) return;
+        svg.classList.remove('play-anim');
+        void svg.getBoundingClientRect();
+        svg.classList.add('play-anim');
+      }
+
+      function setFormType(type) {
+        formType = type;
+        const expBtn = document.getElementById('typeExpenseBtn');
+        const incBtn = document.getElementById('typeIncomeBtn');
+        const chips = document.getElementById('quickChipsWrap');
+        const saveBtn = document.getElementById('btnSaveTx');
+        const isEdit = Boolean(document.getElementById('txEditId').value);
+
+        if (type === 'expense') {
+          expBtn.className = 'py-2 rounded-xl text-xs font-bold bg-white text-[#9a3412] shadow-xs transition';
+          incBtn.className = 'py-2 rounded-xl text-xs font-bold text-slate-500 transition';
+          chips.classList.remove('hidden');
+          saveBtn.className = 'w-full py-3 mt-1 rounded-2xl bg-[#c2410c] hover:bg-[#9a3412] text-white font-bold text-sm transition shadow-md';
+          saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Guardar gasto';
+        } else {
+          incBtn.className = 'py-2 rounded-xl text-xs font-bold bg-white text-[#2B7C85] shadow-xs transition';
+          expBtn.className = 'py-2 rounded-xl text-xs font-bold text-slate-500 transition';
+          chips.classList.add('hidden');
+          saveBtn.className = 'w-full py-3 mt-1 rounded-2xl bg-[#2B7C85] hover:bg-[#215368] text-white font-bold text-sm transition shadow-md';
+          saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Guardar ingreso';
+        }
+        const saveType = document.getElementById('typeSavingBtn');
+        saveType.classList.toggle('bg-white', type === 'saving');
+        saveType.classList.toggle('text-[#2B7C85]', type === 'saving');
+        [expBtn, incBtn, saveType].forEach((button, i) => button.setAttribute('aria-pressed', String(type === ['expense', 'income', 'saving'][i])));
+        if (type === 'saving') {
+          incBtn.className = 'py-2 rounded-xl text-xs font-bold text-slate-500';
+          saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Guardar aporte';
+        }
+        document.getElementById('txCategory').parentElement.hidden = type === 'saving';
+        document.getElementById('txPayment').parentElement.hidden = type === 'saving';
+        const list = type === 'saving' ? [{ id: 'Ahorro', label: 'Aporte de ahorro' }] : type === 'income' ? INCOME_CATS : EXPENSE_CATS;
+        document.getElementById('txCategory').innerHTML = list.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+      }
+
+
+      function weightedDailyPlan({ income, cap, goal, saved, spent, spentToday, dates, outings, upcomingRecurring = 0, daysInMonth = 30 }) {
+        const cents = value => Math.round(value * 100);
+        const past = cents(spent) - cents(spentToday);
+        const capBudget = cap > 0 ? cents(cap) : Infinity;
+        const savingsBudget = income > 0 && goal > 0 && cents(income) >= cents(goal) ? cents(income) - Math.max(cents(goal), cents(saved)) : Infinity;
+        const rawLimit = Math.min(capBudget, savingsBudget);
+        const reservedCents = cents(upcomingRecurring);
+        const limit = Number.isFinite(rawLimit) ? Math.max(0, rawLimit - reservedCents) : Infinity;
+
+        // Safe-to-Spend balanced distribution across remaining days (x2 on outings/special Calendar dates)
+        const weights = dates.map(date => isOutingDay(date, outings) ? 2 : 1);
+        const totalWeight = weights.reduce((sum, w) => sum + w, 0);
+        const available = Math.max(0, limit - past);
+        const plannedToday = Number.isFinite(limit) ? Math.floor(available * weights[0] / totalWeight) : null;
+        const futureWeight = totalWeight - weights[0];
+        const futureBudget = plannedToday === null ? null : Math.max(0, available - Math.max(plannedToday, cents(spentToday)));
+        const days = dates.map((date, i) => {
+          const amount = plannedToday === null ? null : i === 0 ? plannedToday : (futureWeight > 0 ? Math.floor(futureBudget * weights[i] / futureWeight) : 0);
+          return { date, outing: weights[i] === 2, amount: amount === null ? null : amount / 100 };
+        });
+
+        // Preview how much tomorrow rises automatically if today ends with unspent money
+        const rolloverBudgetTomorrow = plannedToday === null ? null : Math.max(0, available - cents(spentToday));
+        const tomorrowIfSaved = rolloverBudgetTomorrow !== null && futureWeight > 0
+          ? Math.floor(rolloverBudgetTomorrow * weights[1] / futureWeight) / 100
+          : null;
+
+        const baselineDaily = Number.isFinite(rawLimit) && daysInMonth > 0 ? (rawLimit / 100) / daysInMonth : null;
+        const nextDaily = days.length > 1 && days[1].amount !== null ? days[1].amount : (plannedToday !== null ? plannedToday / 100 : null);
+        return {
+          days,
+          left: plannedToday === null ? null : Math.max(0, plannedToday - cents(spentToday)) / 100,
+          over: plannedToday !== null && cents(spentToday) > plannedToday,
+          forSavings: Number.isFinite(savingsBudget),
+          baselineDaily,
+          nextDaily,
+          tomorrowIfSaved,
+          reservedUpcoming: upcomingRecurring
+        };
+      }
+
+      function isOutingDay(date, outings) {
+        const exception = outings.overrides[date];
+        if (typeof exception === 'boolean') return exception;
+        if (state.calendarSync && state.specialDays && state.specialDays[date]) return true;
+        return outings.weekly.includes(new Date(date + 'T00:00:00Z').getUTCDay());
+      }
+
+      function specialIconFor(title) {
+        const t = String(title || '').toLowerCase();
+        return '';
+      }
+
+      function renderOutingPlan(isCurrentMonth, inputs) {
+        const card = document.getElementById('dailyBudget');
+        card.hidden = !isCurrentMonth;
+        if (!isCurrentMonth) return;
+
+        const { outings } = state;
+        const dates = Array.from({ length: inputs.daysLeft }, (_, i) => monthKey() + '-' + String(Number(inputs.todayIso.slice(8)) + i).padStart(2, '0'));
+        const plan = weightedDailyPlan({ ...inputs, dates, outings });
+        const left = document.getElementById('dailyLeft');
+        const detail = document.getElementById('dailyDetail');
+        const barFill = document.getElementById('dailyBarFill');
+
+        const missing = inputs.income > 0 ? 'Fija una meta de ahorro en Ajustes.' : inputs.goal > 0 ? 'Indica tu ingreso del mes en Ajustes.' : 'Indica tu ingreso y meta en Ajustes.';
+        const leftSuffix = document.getElementById('dailyLeftSuffix');
+        if (plan.left === null) {
+          left.textContent = 'Sin tope diario';
+          if (leftSuffix) leftSuffix.hidden = true;
+        } else {
+          left.textContent = fmtMoney(plan.left);
+          if (leftSuffix) leftSuffix.hidden = false;
+        }
+
+        const todayCap = plan.days[0] && plan.days[0].amount !== null ? plan.days[0].amount : 0;
+        const usedPct = todayCap > 0 ? Math.min(100, Math.round((inputs.spentToday / todayCap) * 100)) : (inputs.spentToday > 0 ? 100 : 0);
+        barFill.style.width = `${usedPct}%`;
+        barFill.className = plan.over
+          ? 'h-full rounded-full bg-rose-500 transition-all duration-300'
+          : (usedPct >= 80 ? 'h-full rounded-full bg-[#F48C37] transition-all duration-300' : 'h-full rounded-full bg-[#2B7C85] transition-all duration-300');
+
+        const paceBadge = document.getElementById('dailyPaceBadge');
+        if (paceBadge) {
+          if (plan.left === null) {
+            paceBadge.classList.add('hidden');
+          } else if (plan.over || (inputs.capPct >= inputs.threshold)) {
+            paceBadge.className = 'px-1.5 py-0.5 rounded-md text-[11px] font-extrabold bg-rose-100 text-rose-700';
+            paceBadge.textContent = '↓ Gasta menos al día';
+          } else if (plan.baselineDaily && todayCap < plan.baselineDaily * 0.88) {
+            paceBadge.className = 'px-1.5 py-0.5 rounded-md text-[11px] font-extrabold bg-orange-100 text-[#C25E0E]';
+            paceBadge.textContent = '↓ Ritmo ajustado';
+          } else if (plan.baselineDaily && todayCap > plan.baselineDaily * 1.05) {
+            paceBadge.className = 'px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700';
+            paceBadge.textContent = '↑ Con margen';
+          } else {
+            paceBadge.className = 'px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-600';
+            paceBadge.textContent = 'En ritmo';
+          }
+        }
+
+        const recNote = plan.reservedUpcoming > 0 ? ` · ${fmtMoney(plan.reservedUpcoming, true)} fijos reservados` : '';
+        const shortNote = plan.left === null
+          ? missing
+          : plan.over
+          ? `Tope de hoy superado · Próximos días: ${fmtMoney(plan.nextDaily || 0)}/día`
+          : `Gastado hoy: ${fmtMoney(inputs.spentToday)} de ${fmtMoney(todayCap)}${recNote}`;
+        detail.textContent = shortNote;
+
+        for (const button of document.querySelectorAll('[data-outing-weekday]')) {
+          const selected = outings.weekly.includes(Number(button.dataset.outingWeekday));
+          button.setAttribute('aria-pressed', String(selected));
+        }
+
+        const input = document.getElementById('outingDate');
+        input.min = dates[0];
+        input.max = dates.at(-1);
+        if (!input.value || input.value < input.min || input.value > input.max) input.value = dates[0];
+        updateOutingButton();
+
+        // Compact Horizontal Chips for ALL remaining days of the month
+        const remLbl = document.getElementById('remainingDaysLabel');
+        if (remLbl) remLbl.textContent = `Resto del mes (${plan.days.length} ${plan.days.length === 1 ? 'día' : 'días'})`;
+        const detectedSpecials = [];
+        const chips = plan.days.map((day, i) => {
+          const li = document.createElement('li');
+          li.className = 'shrink-0';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.dataset.chipDate = day.date;
+          const dateObj = new Date(day.date + 'T00:00:00Z');
+          const dayShort = i === 0 ? 'Hoy' : `${WEEKDAYS_SHORT[dateObj.getUTCDay()]} ${dateObj.getUTCDate()}`;
+          const calEvent = day.outing && state.calendarSync && state.specialDays ? state.specialDays[day.date] : null;
+          if (calEvent && day.outing) detectedSpecials.push(`${dayShort}: ${calEvent.title}`);
+          const iconPrefix = day.outing ? '<span class="inline-block w-1.5 h-1.5 rounded-full bg-white/90 mr-1 align-middle" aria-hidden="true"></span>' : '';
+          if (calEvent) btn.title = `${calEvent.title} (Presupuesto x2 desde Calendar)`;
+          const chipStyle = day.outing
+            ? 'bg-[#c2410c] text-white border-[#c2410c]'
+            : (i === 0 ? 'bg-[#1F566A] text-white border-[#1F566A]' : 'bg-[#F6F8FA] text-slate-700 border-slate-200/70 hover:border-[#2B7C85]/40');
+          btn.className = `rounded-2xl px-3 py-2 border text-center min-w-[74px] transition ${chipStyle}`;
+          btn.innerHTML = `<div class="text-[11px] font-bold ${day.outing || i === 0 ? 'opacity-90' : 'text-slate-600'}">${iconPrefix}${dayShort}</div><div class="text-xs font-extrabold mt-0.5">${day.amount === null ? '—' : fmtMoney(day.amount, true)}</div>`;
+          li.appendChild(btn);
+          return li;
+        });
+        document.getElementById('outingNextDays').replaceChildren(...chips);
+
+        const specialBanner = document.getElementById('specialDaysBanner');
+        if (specialBanner) {
+          if (detectedSpecials.length) {
+            specialBanner.hidden = false;
+            specialBanner.textContent = `Fecha especial (x2): ${detectedSpecials.slice(0, 2).join(' · ')}`;
+          } else {
+            specialBanner.hidden = true;
+          }
+        }
+
+        const calBtn = document.getElementById('btnToggleCalSync');
+        if (calBtn) {
+          calBtn.setAttribute('aria-checked', String(state.calendarSync));
+          calBtn.textContent = state.calendarSync ? 'Activo' : 'Desactivado';
+          calBtn.className = state.calendarSync
+            ? 'px-3 py-1.5 rounded-full text-xs font-bold transition shrink-0 bg-[#2B7C85] text-white'
+            : 'px-3 py-1.5 rounded-full text-xs font-bold transition shrink-0 bg-slate-200 text-slate-600';
+        }
+      }
+
+      function updateOutingButton() {
+        const selected = document.getElementById('outingDate').value;
+        const button = document.getElementById('toggleOutingDate');
+        button.disabled = !selected;
+        button.textContent = selected && isOutingDay(selected, state.outings) ? 'Marcar normal' : 'Marcar salida';
+      }
+
+      function changeOuting(kind, key, enabled) {
+        if (!ready || pending) return;
+        callServer('finanzasOuting', [monthKey(), kind, key, enabled], data => {
+          applyMonth(data);
+          showToast(enabled ? 'Día de salida activado' : 'Día marcado como normal');
+        });
+      }
+
+      function monthlyBudget(monthTx) {
+        const curMKey = monthKey();
+        const loggedSalary = monthTx.filter(t => t.type === 'income' && t.category === 'Sueldo').reduce((s, t) => s + Number(t.amount), 0);
+        const loggedExtra = monthTx.filter(t => t.type === 'income' && t.category !== 'Sueldo').reduce((s, t) => s + Number(t.amount), 0);
+        let scheduledSalary = 0;
+        let scheduledExtra = 0;
+        const recAmtFor = (r, mk) => (r && r.monthOverrides && Number(r.monthOverrides[mk]) > 0) ? Number(r.monthOverrides[mk]) : Number(r && r.amount || 0);
+        (state.recurring || []).forEach(r => {
+          if (!r || r.active === false || r.type !== 'income') return;
+          if (monthTx.some(t => t.id === `rec-${r.id}-${curMKey}`)) return;
+          if (r.startMonth && curMKey < r.startMonth) return;
+          const mAmt = recAmtFor(r, curMKey);
+          if (r.category === 'Sueldo') scheduledSalary += mAmt;
+          else scheduledExtra += mAmt;
+        });
+        const baseSalary = (loggedSalary + scheduledSalary) > 0 ? (loggedSalary + scheduledSalary) : (Number(state.settings.baseIncome) || 0);
+        const effIncome = baseSalary + loggedExtra + scheduledExtra;
+        const rawGoal = Number(state.settings.savingsGoal) || 0;
+        const goal = rawGoal > 0 ? rawGoal : (effIncome > 0 ? Math.round(effIncome * 0.20 * 100) / 100 : 0);
+        const rawCap = Number(state.settings.maxCap) || 0;
+        const maxCap = rawCap > 0 ? rawCap : (effIncome > 0 ? Math.max(0, Math.round((effIncome - goal) * 100) / 100) : 0);
+        return {effIncome, rawGoal, goal, maxCap};
+      }
+
+      function render() {
+        const monthText = `${MONTHS[state.selectedMonth]} ${state.selectedYear}`;
+        document.getElementById('monthLabel').textContent = monthText;
+        document.getElementById('resumenMonthSub').textContent = monthText;
+        document.querySelectorAll('.currency-lbl').forEach(el => { el.textContent = state.settings.currency; });
+
+        // Privacy Eye Button
+        const privBtn = document.getElementById('btnTogglePrivacy');
+        privBtn.setAttribute('aria-pressed', String(hideAmounts));
+        privBtn.innerHTML = hideAmounts
+          ? '<span class="ms-icon text-[17px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Z"/></svg></span>'
+          : '<span class="ms-icon text-[17px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-80q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></svg></span>';
+
+        const monthTx = getMonthTx();
+        const totalExp = monthTx.filter(t => t.type === 'expense').reduce((s, t) => s + Math.round(t.amount * 100), 0) / 100;
+        const {effIncome, rawGoal, goal, maxCap} = monthlyBudget(monthTx);
+        const threshold = Number(state.settings.alertThreshold) || 80;
+        const recAmtFor = (r, mk) => (r && r.monthOverrides && Number(r.monthOverrides[mk]) > 0) ? Number(r.monthOverrides[mk]) : Number(r && r.amount || 0);
+
+        const saved = monthTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0);
+        const balance = effIncome - totalExp - saved;
+        const capPct = maxCap > 0 ? (totalExp / maxCap) * 100 : 0;
+        const capLabel = Math.floor(capPct);
+        const remCap = maxCap - totalExp;
+        const todayIso = getTodayIso();
+        const todaySpent = monthTx.filter(t => t.type === 'expense' && t.date === todayIso).reduce((s, t) => s + Number(t.amount), 0);
+
+        const daysInMonth = new Date(state.selectedYear, state.selectedMonth + 1, 0).getDate();
+        const daysLeft = todayIso.startsWith(monthKey()) ? daysInMonth - Number(todayIso.slice(8)) + 1 : daysInMonth;
+
+        const mKey = monthKey();
+        const upcomingRecurring = (state.recurring || []).reduce((sum, r) => {
+          if (!r || r.active === false || r.type === 'income') return sum;
+          const alreadyCharged = monthTx.some(t => t.id === `rec-${r.id}-${mKey}`);
+          if (alreadyCharged) return sum;
+          if (r.totalInstallments) {
+            const [sy, sm] = (r.startMonth || mKey).split('-').map(Number);
+            const [ty, tm] = mKey.split('-').map(Number);
+            const diff = (ty - sy) * 12 + (tm - sm);
+            if (diff < 0 || diff >= Number(r.totalInstallments)) return sum;
+          }
+          return sum + recAmtFor(r, mKey);
+        }, 0);
+
+        renderOutingPlan(todayIso.startsWith(mKey), {
+          income: effIncome, cap: maxCap, goal, saved, spent: totalExp, spentToday: todaySpent,
+          daysLeft, todayIso, daysInMonth, capPct, threshold, upcomingRecurring
+        });
+
+        document.getElementById('heroBalance').textContent = fmtMoney(balance);
+        document.getElementById('heroTodaySpent').textContent = todayIso.startsWith(monthKey()) ? `Hoy gastaste ${fmtMoney(todaySpent)}` : 'Saldo del mes seleccionado';
+        document.getElementById('heroIncome').textContent = fmtMoney(effIncome);
+        document.getElementById('heroExpenses').textContent = fmtMoney(totalExp);
+        document.getElementById('resumenTotalBadge').textContent = fmtMoney(totalExp);
+
+        const pill = document.getElementById('heroAlertPill');
+        const dot = document.getElementById('heroAlertDot');
+        const txt = document.getElementById('heroAlertText');
+        const bar = document.getElementById('stripCapBar');
+
+        bar.style.width = `${Math.min(capPct, 100)}%`;
+        document.getElementById('stripCapRatio').textContent = `${capLabel}% usado`;
+        document.getElementById('stripCapRemaining').textContent = remCap >= 0 ? `Te quedan ${fmtMoney(remCap)}` : `Excedido por ${fmtMoney(Math.abs(remCap))}`;
+
+        if (capPct >= 100) {
+          pill.className = 'inline-flex items-center gap-1.5 font-bold text-rose-200';
+          dot.className = 'w-2 h-2 rounded-full bg-rose-400 animate-pulse';
+          txt.textContent = capPct === 100 ? 'Tope mensual alcanzado' : `Tope superado (${capLabel}%)`;
+          bar.className = 'h-full rounded-full bg-rose-400 transition-all duration-300';
+        } else if (capPct >= threshold) {
+          pill.className = 'inline-flex items-center gap-1.5 font-bold text-amber-200';
+          dot.className = 'w-2 h-2 rounded-full bg-[#F48C37] animate-pulse';
+          txt.textContent = `Cerca del tope (${capLabel}%)`;
+          bar.className = 'h-full rounded-full bg-[#F48C37] transition-all duration-300';
+        } else {
+          pill.className = 'inline-flex items-center gap-1.5 font-semibold text-cyan-100';
+          dot.className = 'w-1.5 h-1.5 rounded-full bg-[#45E1F1]';
+          txt.textContent = 'Tope mensual en control';
+          bar.className = 'h-full rounded-full bg-[#45E1F1] transition-all duration-300';
+        }
+
+        if (!maxCap) {
+          txt.textContent = 'Define tu tope en Ajustes';
+          document.getElementById('stripCapRatio').textContent = 'Sin tope';
+          document.getElementById('stripCapRemaining').textContent = '';
+        }
+
+        // Goals Tab
+        document.getElementById('cardCapAmount').textContent = maxCap ? fmtMoney(maxCap) : 'Sin tope';
+        document.getElementById('cardCapLeft').textContent = !maxCap ? 'Configúralo en Ajustes' : remCap >= 0 ? `Quedan ${fmtMoney(remCap)}` : `Excedido ${fmtMoney(Math.abs(remCap))}`;
+        document.getElementById('cardGoalAmount').textContent = goal ? fmtMoney(goal) : 'Sin meta fija';
+        document.getElementById('cardGoalProgress').textContent = `Apartado: ${fmtMoney(saved)}`;
+
+        const nextMark = (Math.floor(Math.round(saved * 100) / 10000) + 1) * 100;
+        const previousMark = nextMark - 100;
+        const goalPct = Math.floor(goal > 0 ? saved * 100 / goal : saved - previousMark);
+        document.getElementById('goalProgressTitle').textContent = goal ? 'Progreso hacia tu meta de ahorro' : 'Próxima marca ' + fmtMoney(nextMark);
+        const rate = effIncome > 0 ? Math.round((saved / effIncome) * 100) : 0;
+        document.getElementById('goalPctLabel').textContent = `${goalPct}%`;
+        document.getElementById('goalProgressBar').style.width = `${Math.min(goalPct, 100)}%`;
+        document.getElementById('savingsRateLabel').textContent = `${rate}%`;
+
+        const maxSpendGoal = effIncome - Math.max(saved, goal);
+        const marginGoal = maxCap ? Math.min(maxSpendGoal - totalExp, remCap) : maxSpendGoal - totalExp;
+        document.getElementById('coachBody').innerHTML = maxCap && remCap < 0
+          ? 'Ya superaste tu tope de gastos del mes.'
+          : !goal
+          ? 'Puedes registrar aportes y avanzar hacia la siguiente marca de ahorro.'
+          : marginGoal >= 0
+          ? `Para lograr tu meta de <strong>${fmtMoney(goal)}</strong>, aún puedes gastar <strong>${fmtMoney(marginGoal)}</strong> en el mes.`
+          : `Tus gastos actuales superan el límite para tu meta en <strong>${fmtMoney(Math.abs(marginGoal))}</strong>. Ajusta gastos o suma un ingreso extra.`;
+
+        renderPiggyNudge({ effIncome, goal, saved, rawGoal, todayIso, monthTx });
+        renderTxList(monthTx);
+        renderRecurring(monthTx);
+        if (activeTab === 'Resumen') renderCharts();
+      }
+
+      function renderRecurring(monthTx) {
+        const list = state.recurring || [];
+        const activeList = list.filter(r => r.active !== false);
+        const mKey = monthKey();
+        const getAmt = r => (r && r.monthOverrides && Number(r.monthOverrides[mKey]) > 0) ? Number(r.monthOverrides[mKey]) : Number(r && r.amount || 0);
+        const totalFixedExp = activeList.filter(r => r.type !== 'income').reduce((sum, r) => sum + getAmt(r), 0);
+        const totalFixedInc = activeList.filter(r => r.type === 'income').reduce((sum, r) => sum + getAmt(r), 0);
+
+        const totalEl = document.getElementById('recurringTotalMonthly');
+        if (totalEl) {
+          const parts = [];
+          if (totalFixedInc > 0) parts.push(`Ingresos: ${fmtMoney(totalFixedInc)}`);
+          if (totalFixedExp > 0) parts.push(`Pagos: ${fmtMoney(totalFixedExp)}`);
+          totalEl.textContent = parts.length ? parts.join(' · ') : 'Se registran solos en su fecha';
+        }
+
+        const wrap = document.getElementById('recurringList');
+        const empty = document.getElementById('recurringEmpty');
+        if (!wrap || !empty) return;
+
+        if (list.length === 0) {
+          wrap.innerHTML = '';
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+
+        const [ty, tm] = mKey.split('-').map(Number);
+        wrap.innerHTML = list.map(r => {
+          const isActive = r.active !== false;
+          const isInc = r.type === 'income';
+          const meta = getCatMeta(r.category, isInc ? 'income' : 'expense');
+          const recId = `rec-${r.id}-${mKey}`;
+          const applied = monthTx.some(t => t.id === recId);
+          const hasOverride = Boolean(r.monthOverrides && Number(r.monthOverrides[mKey]) > 0);
+          const displayAmt = getAmt(r);
+          const overrideBadge = hasOverride ? `<span class="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[11px] font-bold">Ajustado este mes</span>` : '';
+          let quotaBadge = '';
+          if (!isInc && r.totalInstallments) {
+            const [sy, sm] = (r.startMonth || mKey).split('-').map(Number);
+            const cuotaNum = Math.max(1, (ty - sy) * 12 + (tm - sm) + 1);
+            const done = cuotaNum > r.totalInstallments;
+            quotaBadge = done
+              ? `<span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[11px] font-bold">Finalizado</span>`
+              : `<span class="px-1.5 py-0.5 rounded-md bg-[#E4F9FD] text-[#215368] text-[11px] font-bold">Cuota ${cuotaNum}/${r.totalInstallments}</span>`;
+          }
+          const statusBadge = !isActive
+            ? `<span class="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[11px] font-bold">Pausado</span>`
+            : applied
+            ? `<span class="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[11px] font-bold">${isInc ? '✓ Depositado' : '✓ Descontado'}</span>`
+            : `<span class="px-1.5 py-0.5 rounded-md ${isInc ? 'bg-[#E4F9FD] text-[#215368]' : 'bg-orange-50 text-[#9a3412]'} text-[11px] font-bold">${Number(r.dayOfMonth) === 31 ? 'Fin de mes' : Number(r.dayOfMonth) === 15 ? 'Quincena' : 'Día ' + r.dayOfMonth}</span>`;
+
+          return `
+            <div class="rounded-2xl p-3 border ${isActive ? 'border-slate-200/70 bg-white/80' : 'border-slate-100 bg-slate-50/40 opacity-65'} flex items-center justify-between gap-2.5">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl ${meta.bg || 'bg-[#E4F9FD] text-[#003e51]'} flex items-center justify-center shrink-0">
+                  ${msSvg(meta.icon || 'payments', 'text-[18px]')}
+                </div>
+                <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-xs font-extrabold text-slate-900 truncate">${escapeHtml(r.concept)}</span>
+                  ${statusBadge}
+                  ${quotaBadge}
+                  ${overrideBadge}
+                </div>
+                <div class="text-[11px] text-slate-500 mt-0.5 truncate">${escapeHtml(meta.label)} · ${Number(r.dayOfMonth) === 31 ? 'Cada fin de mes' : Number(r.dayOfMonth) === 15 ? 'Cada quincena (día 15)' : 'Cada día ' + r.dayOfMonth}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="text-xs font-extrabold ${isInc ? 'text-[#2B7C85]' : 'text-[#9a3412]'} mr-1">${isInc ? '+' : '-'}${fmtMoney(displayAmt)}</span>
+                <button type="button" data-rec-action="edit" data-rec-id="${escapeHtml(r.id)}" aria-label="Editar"
+                  class="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#2B7C85] transition">
+                  <span class="ms-icon text-[16px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg></span>
+                </button>
+                <button type="button" data-rec-action="toggle" data-rec-id="${escapeHtml(r.id)}" data-rec-active="${isActive}" aria-label="${isActive ? 'Pausar' : 'Activar'}"
+                  class="p-1.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-[#2B7C85] transition">
+                  ${msSvg(isActive ? 'pause' : 'play_arrow', 'text-[16px]')}
+                </button>
+                <button type="button" data-rec-action="delete" data-rec-id="${escapeHtml(r.id)}" aria-label="Eliminar"
+                  class="w-11 h-11 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-rose-700 flex items-center justify-center transition">
+                  <span class="ms-icon text-[16px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360Z"/></svg></span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderTxList(monthTx) {
+        const fType = document.getElementById('filterType').value;
+        const filtered = monthTx.filter(t => fType === 'ALL' || t.type === fType);
+        const container = document.getElementById('txListContainer');
+        const empty = document.getElementById('txListEmpty');
+
+        if (filtered.length === 0) {
+          container.innerHTML = '';
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+
+        container.innerHTML = filtered.map(t => {
+          const isExp = t.type === 'expense';
+          const isSaving = t.type === 'saving';
+          const meta = getCatMeta(t.category, t.type);
+          const iconBg = meta.bg || (isExp ? 'bg-orange-50 text-[#7e3e00]' : 'bg-[#E4F9FD] text-[#003e51]');
+          const iconName = isSaving ? 'savings' : (meta.icon || (isExp ? 'shopping_bag' : 'payments'));
+          const amtColor = isExp ? 'text-[#191c1e]' : 'text-[#0a6871]';
+          return `
+            <div class="stitch-glass rounded-2xl p-3.5 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-2xl ${iconBg} flex items-center justify-center shrink-0">
+                  ${msSvg(iconName, 'text-[20px]')}
+                </div>
+                <div class="min-w-0">
+                  <div class="text-xs font-extrabold ${isExp ? 'text-slate-900' : 'text-[#215368]'} truncate">${escapeHtml(t.concept)}</div>
+                  <div class="text-[11px] text-slate-600 truncate">${escapeHtml(meta.label)}${t.payment ? ' · ' + escapeHtml(t.payment) : ''}</div>
+                </div>
+              </div>
+              <div class="text-right shrink-0 flex items-center gap-2">
+                <div>
+                  <div class="text-xs font-extrabold ${amtColor}">${isExp ? '-' : '+'}${fmtMoney(t.amount)}</div>
+                  <div class="text-[11px] text-slate-600">${escapeHtml(fmtShortDate(t.date))}</div>
+                </div>
+                ${t.readOnly ? '' : `<div class="flex flex-col gap-1">
+                  <button type="button" data-action="edit" data-id="${escapeHtml(t.id)}" aria-label="Editar" class="p-1 text-slate-300 hover:text-[#2B7C85]">
+                    <span class="ms-icon text-[16px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg></span>
+                  </button>
+                  <button type="button" data-action="delete" data-id="${escapeHtml(t.id)}" aria-label="Eliminar" class="p-1 text-slate-300 hover:text-rose-500">
+                    <span class="ms-icon text-[16px]"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360Z"/></svg></span>
+                  </button>
+                </div>`}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      function renderCharts() {
+        if (!window.Chart) return;
+        const monthTx = getMonthTx();
+        const expenses = monthTx.filter(t => t.type === 'expense');
+        const totals = Object.create(null);
+        expenses.forEach(t => { totals[t.category] = (totals[t.category] || 0) + Number(t.amount); });
+        const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+        const sumExp = expenses.reduce((s, t) => s + Number(t.amount), 0);
+
+        const {effIncome: effInc, maxCap: cap} = monthlyBudget(monthTx);
+        const threshold = Number(state.settings.alertThreshold) || 80;
+        const capPct = cap > 0 ? Math.round((sumExp / cap) * 100) : 0;
+        const incPct = effInc > 0 ? Math.round((sumExp / effInc) * 100) : 0;
+        const remCap = cap - sumExp;
+
+        // Update Resumen KPI Inset Cards & Status Pill
+        document.getElementById('resumenDonutVal').textContent = fmtMoney(sumExp, true);
+        document.getElementById('resumenCumVal').textContent = fmtMoney(sumExp);
+        document.getElementById('resumenCumSub').textContent = effInc > 0 ? `${incPct}% de tus ingresos` : `${expenses.length} gastos`;
+        document.getElementById('resumenCapVal').textContent = cap > 0 ? fmtMoney(cap) : 'Sin tope';
+        document.getElementById('resumenCapSub').textContent = cap > 0
+          ? (remCap >= 0 ? `Margen: ${fmtMoney(remCap, true)}` : `Excedido: ${fmtMoney(Math.abs(remCap), true)}`)
+          : 'Configura tu sueldo';
+
+        const statusPill = document.getElementById('resumenStatusPill');
+        if (cap > 0 && capPct >= 100) {
+          statusPill.className = 'px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-rose-100 text-rose-700 shrink-0';
+          statusPill.textContent = 'Tope superado';
+        } else if (cap > 0 && capPct >= threshold) {
+          statusPill.className = 'px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-amber-100 text-amber-800 shrink-0';
+          statusPill.textContent = `Cerca (${capPct}%)`;
+        } else {
+          statusPill.className = 'px-2.5 py-1 rounded-full text-[11px] font-extrabold bg-[#a3eff9]/60 text-[#004f56] shrink-0';
+          statusPill.textContent = 'Bajo control';
+        }
+
+        // 1. Doughnut Chart with Centered Metric + Bar Legend
+        if (catChart) { catChart.destroy(); catChart = null; }
+        const emptyEl = document.getElementById('catChartEmpty');
+        const centerEl = document.getElementById('catDonutCenter');
+        const legendEl = document.getElementById('catLegend');
+
+        if (sorted.length === 0) {
+          emptyEl.classList.remove('hidden');
+          centerEl.classList.add('hidden');
+          legendEl.innerHTML = '';
+        } else {
+          emptyEl.classList.add('hidden');
+          centerEl.classList.remove('hidden');
+          const ctx = document.getElementById('catChart').getContext('2d');
+          catChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+              labels: sorted.map(([c]) => c),
+              datasets: [{
+                data: sorted.map(([, v]) => v),
+                backgroundColor: sorted.map(([c]) => getCatMeta(c, 'expense').color),
+                borderWidth: 3,
+                borderColor: '#ffffff',
+                hoverOffset: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              cutout: '72%',
+              plugins: { legend: { display: false }, tooltip: { enabled: !hideAmounts } }
+            }
+          });
+
+          legendEl.innerHTML = sorted.map(([cat, val]) => {
+            const meta = getCatMeta(cat, 'expense');
+            const pct = sumExp > 0 ? Math.round((val / sumExp) * 100) : 0;
+            return `
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between text-xs gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-7 h-7 rounded-xl ${meta.bg || 'bg-slate-100 text-slate-700'} flex items-center justify-center shrink-0">
+                      ${msSvg(meta.icon || 'category', 'text-[15px]')}
+                    </span>
+                    <span class="font-bold text-[#191c1e] truncate">${escapeHtml(meta.label)}</span>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <span class="font-extrabold text-[#191c1e]">${fmtMoney(val)}</span>
+                    <span class="text-[11px] font-semibold text-[#525a5e] ml-1">${pct}%</span>
+                  </div>
+                </div>
+                <div class="w-full h-1.5 bg-[#eceef0] rounded-full overflow-hidden">
+                  <div class="h-full rounded-full transition-all duration-300" style="width:${pct}%; background:${meta.color}"></div>
+                </div>
+              </div>`;
+          }).join('');
+        }
+
+        // 2. Smooth Area-Filled Cumulative Curve vs Dashed Orange Cap
+        const daysInMonth = new Date(state.selectedYear, state.selectedMonth + 1, 0).getDate();
+        const dailyData = Array.from({ length: daysInMonth }, () => 0);
+        expenses.forEach(t => {
+          const d = parseInt((t.date || '').split('-')[2], 10);
+          if (d >= 1 && d <= daysInMonth) dailyData[d - 1] += Number(t.amount);
+        });
+        let accumulated = 0;
+        const accumulatedData = dailyData.map(amount => accumulated += amount);
+        if (dailyChart) { dailyChart.destroy(); dailyChart = null; }
+        const dCtx = document.getElementById('dailyChart').getContext('2d');
+        const areaGrad = dCtx.createLinearGradient(0, 0, 0, 190);
+        areaGrad.addColorStop(0, 'rgba(10, 104, 113, 0.28)');
+        areaGrad.addColorStop(1, 'rgba(10, 104, 113, 0.01)');
+
+        dailyChart = new Chart(dCtx, {
+          type: 'line',
+          data: {
+            labels: Array.from({ length: daysInMonth }, (_, i) => String(i + 1)),
+            datasets: [
+              {
+                label: 'Gasto acumulado',
+                data: accumulatedData,
+                borderColor: '#0a6871',
+                backgroundColor: areaGrad,
+                borderWidth: 2.5,
+                fill: true,
+                tension: 0.32,
+                pointRadius: 0,
+                pointHoverRadius: 4
+              },
+              {
+                label: 'Tope mensual',
+                data: Array.from({ length: daysInMonth }, () => cap || null),
+                borderColor: '#F48C37',
+                borderWidth: 2,
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: { enabled: !hideAmounts },
+              legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, font: { size: 11, weight: '600' } } }
+            },
+            scales: {
+              y: { beginAtZero: true, border: { display: false }, ticks: { display: !hideAmounts, color: '#94a3b8', font: { size: 10 } }, grid: { color: '#eef2f5' } },
+              x: { border: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxTicksLimit: 6 }, grid: { display: false } }
+            }
+          }
+        });
+      }
+
+      function syncBudgetPreview() {
+        const cur = document.getElementById('setCurrency').value || state.settings.currency || 'S/';
+        const inc = Math.max(0, Number(document.getElementById('setBaseIncome').value) || 0);
+        const cap = Math.max(0, Number(document.getElementById('setMaxCap').value) || 0);
+        const goal = Math.max(0, Number(document.getElementById('setSavingsGoal').value) || 0);
+        const pct = Math.max(50, Math.min(95, Number(document.getElementById('setThreshold').value) || 80));
+
+        const fmtPreview = (n) => `${cur} ${Number(n || 0).toLocaleString('es-PE', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        const total = inc > 0 ? inc : (cap + goal);
+        const capShare = total > 0 ? Math.min(100, Math.round((cap / total) * 100)) : 80;
+        const saveShare = total > 0 ? Math.min(100 - capShare, Math.round((goal / total) * 100)) : 20;
+
+        document.getElementById('splitCapBar').style.width = `${capShare}%`;
+        document.getElementById('splitSaveBar').style.width = `${saveShare}%`;
+        document.getElementById('splitSummaryLabel').textContent = `${capShare}% gastos · ${saveShare}% ahorro`;
+        document.getElementById('capPctBadge').textContent = `${capShare}%`;
+        document.getElementById('savePctBadge').textContent = `${saveShare}%`;
+
+        const alertAmt = Math.round(cap * (pct / 100) * 100) / 100;
+        const marginAmt = Math.max(0, Math.round((cap - alertAmt) * 100) / 100);
+        document.getElementById('thresholdVal').textContent = `${pct}% del tope`;
+        document.getElementById('thresholdMoneyVal').textContent = fmtPreview(alertAmt);
+        document.getElementById('thresholdCapRef').textContent = `Tope: ${fmtPreview(cap)}`;
+        document.getElementById('thresholdHint').textContent = cap > 0
+          ? `Alerta al gastar ${fmtPreview(alertAmt)} (cuando falten ${fmtPreview(marginAmt)} para tu tope).`
+          : 'Define tu tope de gasto para calcular el monto de aviso.';
+      }
+
+      function populateSettingsForm() {
+        const inc = Number(state.settings.baseIncome) || 0;
+        const autoGoal = inc > 0 ? Math.round(inc * 0.20 * 100) / 100 : 0;
+        const shownGoal = Number(state.settings.savingsGoal) > 0 ? state.settings.savingsGoal : autoGoal;
+        const autoCap = inc > 0 ? Math.max(0, Math.round((inc - shownGoal) * 100) / 100) : 0;
+        const shownCap = Number(state.settings.maxCap) > 0 ? state.settings.maxCap : autoCap;
+        document.getElementById('setCurrency').value = state.settings.currency;
+        document.getElementById('setBaseIncome').value = inc;
+        document.getElementById('setMaxCap').value = shownCap;
+        document.getElementById('setThreshold').value = state.settings.alertThreshold;
+        document.getElementById('setSavingsGoal').value = shownGoal;
+        syncBudgetPreview();
+      }
+
+      function openTxModal(editTx = null) {
+        document.getElementById('txError').textContent = '';
+        intent = null;
+        if (editTx) {
+          document.getElementById('txModalTitle').textContent = 'Editar movimiento';
+          document.getElementById('txEditId').value = editTx.id;
+          setFormType(editTx.type);
+          document.getElementById('txConcept').value = editTx.concept;
+          document.getElementById('txAmount').value = editTx.amount;
+          document.getElementById('txDate').value = editTx.date;
+          document.getElementById('txCategory').value = editTx.type === 'saving' ? 'Ahorro' : editTx.category;
+          document.getElementById('txPayment').value = editTx.payment || '';
+        } else {
+          document.getElementById('txModalTitle').textContent = 'Nuevo movimiento';
+          document.getElementById('txEditId').value = '';
+          setFormType('expense');
+          document.getElementById('txConcept').value = '';
+          document.getElementById('txAmount').value = '';
+          document.getElementById('txDate').value = getDefaultDate();
+          document.getElementById('txPayment').value = '';
+        }
+        document.getElementById('txModal').showModal();
+      }
+
+      function closeTxModal() {
+        document.getElementById('txModal').close();
+      }
+
+      function openOutingsModal(preselectDate) {
+        if (preselectDate) {
+          document.getElementById('outingDate').value = preselectDate;
+          updateOutingButton();
+        }
+        document.getElementById('outingsModal').showModal();
+      }
+
+      function showSavingCelebration(amount) {
+        const block = document.getElementById('celebration');
+        if (!block || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        document.getElementById('gain').textContent = hideAmounts ? '' : '+' + fmtMoney(amount);
+        block.hidden = true;
+        void block.offsetWidth;
+        block.hidden = false;
+        setTimeout(() => { block.hidden = true; }, 1450);
+      }
+
+      function openConfirm(title, msg, cb) {
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMsg').textContent = msg;
+        confirmCb = cb;
+        document.getElementById('confirmModal').classList.remove('hidden');
+      }
+
+      // Events
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+      });
+
+      document.getElementById('btnPrevMonth').addEventListener('click', () => shiftMonth(-1));
+      document.getElementById('btnNextMonth').addEventListener('click', () => shiftMonth(1));
+      document.getElementById('btnResumenPrev').addEventListener('click', () => shiftMonth(-1));
+      document.getElementById('btnResumenNext').addEventListener('click', () => shiftMonth(1));
+      retry.addEventListener('click', () => loadMonth());
+
+      document.getElementById('btnTogglePrivacy').addEventListener('click', () => {
+        hideAmounts = !hideAmounts;
+        try { localStorage.setItem(PRIVACY_KEY, String(hideAmounts)); } catch (_) {}
+        render();
+      });
+
+      document.getElementById('btnOpenOutings').addEventListener('click', () => openOutingsModal());
+      document.getElementById('btnCloseOutingsModal').addEventListener('click', () => document.getElementById('outingsModal').close());
+      document.getElementById('outingNextDays').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-chip-date]');
+        if (btn) openOutingsModal(btn.dataset.chipDate);
+      });
+
+      document.getElementById('btnEditLimitsFromGoals').addEventListener('click', () => switchTab('Ajustes'));
+      document.getElementById('btnFabAdd').addEventListener('click', () => openTxModal(null));
+      document.getElementById('btnCloseTxModal').addEventListener('click', closeTxModal);
+      document.getElementById('typeExpenseBtn').addEventListener('click', () => setFormType('expense'));
+      document.getElementById('typeIncomeBtn').addEventListener('click', () => setFormType('income'));
+      document.getElementById('typeSavingBtn').addEventListener('click', () => setFormType('saving'));
+      document.getElementById('filterType').addEventListener('change', () => renderTxList(getMonthTx()));
+      document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+          const val = pill.getAttribute('data-filter-pill');
+          document.getElementById('filterType').value = val;
+          document.querySelectorAll('.filter-pill').forEach(b => {
+            const act = b.getAttribute('data-filter-pill') === val;
+            b.className = act
+              ? 'filter-pill px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#003e51] text-white transition shrink-0'
+              : 'filter-pill px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white text-[#40484c] border border-slate-200/80 transition shrink-0';
+          });
+          renderTxList(getMonthTx());
+        });
+      });
+
+      document.querySelectorAll('.quick-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const [concept, cat] = btn.getAttribute('data-quick').split('|');
+          setFormType('expense');
+          document.getElementById('txConcept').value = concept;
+          document.getElementById('txCategory').value = cat;
+          document.getElementById('txAmount').focus();
+        });
+      });
+
+      document.getElementById('txForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!ready || pending) return;
+        const editId = document.getElementById('txEditId').value;
+        const draft = {
+          type: formType,
+          concept: document.getElementById('txConcept').value.trim(),
+          amount: Number(document.getElementById('txAmount').value),
+          date: document.getElementById('txDate').value,
+          category: document.getElementById('txCategory').value,
+          payment: document.getElementById('txPayment').value
+        };
+        const key = JSON.stringify(draft);
+        if (!intent || intent.key !== key) intent = { key, id: crypto.randomUUID() };
+        const err = document.getElementById('txError');
+        err.textContent = '';
+        const finalTxId = editId || intent.id;
+        callServer('finanzasSave', [{ ...draft, id: finalTxId }, Boolean(editId)], data => {
+          closeTxModal();
+          applyMonth(data);
+          if (draft.type === 'saving' && !editId) {
+            switchTab('Ahorro');
+            showSavingCelebration(draft.amount);
+          }
+          if (draft.type === 'expense') {
+            const mExp = getMonthTx().filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0);
+            const rawC = Number(state.settings.maxCap) || 0;
+            const inc = Number(state.settings.baseIncome) || 0;
+            const g = Number(state.settings.savingsGoal) || Math.round(inc * 0.20 * 100) / 100;
+            const c = rawC > 0 ? rawC : Math.max(0, inc - g);
+            const p = c > 0 ? Math.round((mExp / c) * 100) : 0;
+            if (c > 0 && p >= 100) showToast(`¡Alerta! Superaste tu tope mensual (${p}%)`, 'danger');
+            else if (c > 0 && p >= (Number(state.settings.alertThreshold) || 80)) showToast(`Cuidado: llevas ${p}% de tu tope mensual`, 'warn');
+            else showToast(editId ? 'Movimiento actualizado' : 'Gasto guardado');
+          } else {
+            showToast(editId ? 'Movimiento actualizado' : 'Guardado en Google Sheets');
+          }
+        }, message => { err.textContent = message; });
+      });
+
+      document.getElementById('txListContainer').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn || pending) return;
+        const id = btn.getAttribute('data-id');
+        const tx = state.transactions.find(t => t.id === id);
+        if (!tx) return;
+        if (btn.getAttribute('data-action') === 'edit') {
+          openTxModal(tx);
+        } else {
+          openConfirm('¿Eliminar movimiento?', `Se borrará "${tx.concept}" (${fmtMoney(tx.amount)}).`, () => {
+            callServer('finanzasDelete', [id, monthKey()], data => { applyMonth(data); showToast('Movimiento eliminado'); });
+          });
+        }
+      });
+
+      document.getElementById('btnApply20Rule').addEventListener('click', () => {
+        const {effIncome: inc} = monthlyBudget(getMonthTx());
+        if (inc <= 0) { showToast('Configura primero tu ingreso mensual', 'warn'); switchTab('Ajustes'); return; }
+        const goal = Math.round(inc * 0.2 * 100) / 100;
+        updateSettings({ ...state.settings, savingsGoal: goal }, 'Meta guardada');
+      });
+
+      document.getElementById('setThreshold').addEventListener('input', syncBudgetPreview);
+      document.getElementById('setCurrency').addEventListener('change', syncBudgetPreview);
+      document.getElementById('setMaxCap').addEventListener('input', syncBudgetPreview);
+
+      document.getElementById('settingsForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!ready || pending) return;
+        updateSettings({
+          currency: document.getElementById('setCurrency').value,
+          baseIncome: Number(document.getElementById('setBaseIncome').value),
+          maxCap: Number(document.getElementById('setMaxCap').value),
+          alertThreshold: Number(document.getElementById('setThreshold').value),
+          savingsGoal: Number(document.getElementById('setSavingsGoal').value)
+        }, 'Configuración guardada en Google Sheets');
+      });
+
+      document.getElementById('btnExportCsv').addEventListener('click', () => {
+        const rows = getMonthTx();
+        if (!rows.length) { showToast('No hay movimientos este mes', 'warn'); return; }
+        const header = ['Fecha', 'Tipo', 'Concepto', 'Categoria', 'Metodo', 'Monto'];
+        const csvCell = value => {
+          const text = String(value);
+          const safe = /^[=+@\-\t\r]/.test(text) ? "'" + text : text;
+          return '"' + safe.replace(/"/g, '""') + '"';
+        };
+        const csv = '\uFEFF' + [header.join(','), ...rows.map(r => [r.date, r.type === 'saving' ? 'Ahorro' : r.type === 'expense' ? 'Gasto' : 'Ingreso', csvCell(r.concept), csvCell(r.category), csvCell(r.payment), r.type === 'expense' ? -r.amount : r.amount].join(','))].join('\n');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = `finanzas_${state.selectedYear}_${state.selectedMonth + 1}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        showToast('CSV descargado');
+      });
+
+      document.getElementById('btnConfirmCancel').addEventListener('click', () => {
+        confirmCb = null; document.getElementById('confirmModal').classList.add('hidden');
+      });
+      document.getElementById('btnConfirmOk').addEventListener('click', () => {
+        const cb = confirmCb; confirmCb = null;
+        document.getElementById('confirmModal').classList.add('hidden');
+        if (cb) cb();
+      });
+
+      for (const button of document.querySelectorAll('[data-outing-weekday]')) {
+        button.addEventListener('click', () => {
+          const day = Number(button.dataset.outingWeekday);
+          changeOuting('weekly', day, !state.outings.weekly.includes(day));
+        });
+      }
+      document.getElementById('outingDate').addEventListener('change', updateOutingButton);
+      document.getElementById('toggleOutingDate').addEventListener('click', () => {
+        const date = document.getElementById('outingDate').value;
+        if (date) changeOuting('date', date, !isOutingDay(date, state.outings));
+      });
+      document.getElementById('btnToggleCalSync').addEventListener('click', () => {
+        if (!ready || pending) return;
+        callServer('finanzasToggleCalendarSync', [!state.calendarSync, monthKey()], data => {
+          applyMonth(data);
+          showToast(state.calendarSync ? 'Google Calendar sincronizado' : 'Sincronización pausada');
+        }, message => showToast(message, 'warn'));
+      });
+
+      // Recurring payments modal & events
+      let recType = 'expense';
+      let recIsQuota = false;
+
+      function setRecType(type) {
+        recType = type === 'income' ? 'income' : 'expense';
+        const btnExp = document.getElementById('recTypeExpense');
+        const btnInc = document.getElementById('recTypeIncome');
+        const catSel = document.getElementById('recCategory');
+        const durBox = document.getElementById('recDurationBox');
+        const amtInput = document.getElementById('recAmount');
+        const saveBtn = document.getElementById('btnSaveRec');
+        const isEdit = Boolean(document.getElementById('recEditId').value);
+
+        const expPresets = document.getElementById('recExpensePresets');
+        const incPresets = document.getElementById('recIncomePresets');
+        if (recType === 'income') {
+          btnInc.className = 'py-2 rounded-xl text-xs font-bold bg-white text-[#2B7C85] shadow-xs transition';
+          btnExp.className = 'py-2 rounded-xl text-xs font-bold text-slate-500 transition';
+          if (expPresets) expPresets.classList.add('hidden');
+          if (incPresets) { incPresets.classList.remove('hidden'); incPresets.classList.add('flex'); }
+          catSel.innerHTML = INCOME_CATS.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+          durBox.classList.add('hidden');
+          setRecMode(false);
+          amtInput.className = 'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-extrabold text-[#2B7C85] focus:outline-none focus:ring-2 focus:ring-[#38D3E8]';
+          saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Activar ingreso automático';
+          if (!document.getElementById('recConcept').value) document.getElementById('recConcept').value = 'Sueldo mensual';
+          document.getElementById('recScheduleTitle').textContent = '¿Cuándo se deposita cada mes?';
+          document.getElementById('recPayment').value = 'Transferencia';
+          if (!isEdit) setRecSchedule('31');
+        } else {
+          btnExp.className = 'py-2 rounded-xl text-xs font-bold bg-white text-[#9a3412] shadow-xs transition';
+          btnInc.className = 'py-2 rounded-xl text-xs font-bold text-slate-500 transition';
+          if (expPresets) expPresets.classList.remove('hidden');
+          if (incPresets) { incPresets.classList.add('hidden'); incPresets.classList.remove('flex'); }
+          catSel.innerHTML = EXPENSE_CATS.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+          durBox.classList.remove('hidden');
+          amtInput.className = 'w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-extrabold text-[#9a3412] focus:outline-none focus:ring-2 focus:ring-[#F48C37]';
+          saveBtn.textContent = isEdit ? 'Guardar cambios' : 'Activar cobro automático';
+          document.getElementById('recScheduleTitle').textContent = '¿Cuándo se cobra cada mes?';
+          if (document.getElementById('recConcept').value === 'Sueldo mensual') document.getElementById('recConcept').value = '';
+        }
+      }
+
+      function setRecSchedule(mode, customDayVal) {
+        const customWrap = document.getElementById('recCustomDayWrap');
+        const dayInput = document.getElementById('recDay');
+        const btns = document.querySelectorAll('.sched-btn');
+        btns.forEach(b => {
+          const active = b.getAttribute('data-sched') === mode;
+          b.className = active
+            ? 'sched-btn py-2.5 px-2 rounded-xl border border-[#2B7C85] bg-[#E4F9FD] text-[#215368] text-xs font-extrabold flex items-center justify-center gap-1 transition shadow-xs'
+            : 'sched-btn py-2.5 px-2 rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 text-xs font-bold flex items-center justify-center gap-1 transition';
+        });
+        if (mode === '15') {
+          dayInput.value = '15';
+          customWrap.classList.add('hidden');
+        } else if (mode === '31') {
+          dayInput.value = '31';
+          customWrap.classList.add('hidden');
+        } else {
+          if (customDayVal) dayInput.value = String(customDayVal);
+          customWrap.classList.remove('hidden');
+        }
+      }
+      function setRecMode(isQuota) {
+        recIsQuota = isQuota;
+        const btnIndef = document.getElementById('recModeIndef');
+        const btnQuota = document.getElementById('recModeQuota');
+        const wrap = document.getElementById('recQuotaWrap');
+        if (isQuota) {
+          btnQuota.className = 'px-2.5 py-1 rounded-lg bg-[#2B7C85] text-white transition';
+          btnIndef.className = 'px-2.5 py-1 rounded-lg text-slate-500 transition';
+          wrap.classList.remove('hidden');
+        } else {
+          btnIndef.className = 'px-2.5 py-1 rounded-lg bg-[#2B7C85] text-white transition';
+          btnQuota.className = 'px-2.5 py-1 rounded-lg text-slate-500 transition';
+          wrap.classList.add('hidden');
+          document.getElementById('recInstallments').value = '';
+        }
+      }
+
+      let recOnlyThisMonth = false;
+      function setRecScope(onlyMonth) {
+        recOnlyThisMonth = Boolean(onlyMonth);
+        const btnM = document.getElementById('btnRecScopeMonth');
+        const btnA = document.getElementById('btnRecScopeAll');
+        const hint = document.getElementById('recScopeHint');
+        if (recOnlyThisMonth) {
+          btnM.className = 'py-2 px-2 rounded-xl border border-[#2B7C85] bg-[#E4F9FD] text-[#215368] text-xs font-extrabold transition';
+          btnA.className = 'py-2 px-2 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs font-bold transition';
+          hint.textContent = 'Ajusta el monto solo en este mes; el próximo volverá a su valor normal.';
+        } else {
+          btnA.className = 'py-2 px-2 rounded-xl border border-[#2B7C85] bg-[#E4F9FD] text-[#215368] text-xs font-extrabold transition';
+          btnM.className = 'py-2 px-2 rounded-xl border border-slate-200 bg-white text-slate-500 text-xs font-bold transition';
+          hint.textContent = 'Actualiza el monto permanente para este y los próximos meses.';
+        }
+      }
+
+      function openRecurringModal(editItem = null) {
+        document.getElementById('recurringForm').reset();
+        const scopeWrap = document.getElementById('recEditScopeWrap');
+        if (editItem) {
+          const mk = monthKey();
+          const currentAmt = editItem.monthOverrides && Number(editItem.monthOverrides[mk]) > 0 ? Number(editItem.monthOverrides[mk]) : editItem.amount;
+          document.getElementById('recModalTitle').textContent = 'Editar movimiento fijo';
+          document.getElementById('recEditId').value = editItem.id;
+          document.getElementById('recEditStartMonth').value = editItem.startMonth || mk;
+          setRecType(editItem.type === 'income' ? 'income' : 'expense');
+          document.getElementById('recConcept').value = editItem.concept;
+          document.getElementById('recAmount').value = currentAmt;
+          scopeWrap.classList.remove('hidden');
+          document.getElementById('btnRecScopeMonth').textContent = `Solo ${MONTHS[state.selectedMonth]}`;
+          setRecScope(true);
+          const dNum = Number(editItem.dayOfMonth) || 15;
+          setRecSchedule(dNum === 31 ? '31' : dNum === 15 ? '15' : 'custom', dNum);
+          document.getElementById('recCategory').value = editItem.category;
+          document.getElementById('recPayment').value = editItem.payment;
+          const q = Number(editItem.totalInstallments) || 0;
+          setRecMode(recType === 'expense' && q > 0);
+          if (recType === 'expense' && q > 0) document.getElementById('recInstallments').value = String(q);
+        } else {
+          scopeWrap.classList.add('hidden');
+          setRecScope(false);
+          document.getElementById('recModalTitle').textContent = 'Nuevo movimiento fijo';
+          document.getElementById('recEditId').value = '';
+          document.getElementById('recEditStartMonth').value = '';
+          setRecType('expense');
+          setRecSchedule('15');
+          setRecMode(false);
+        }
+        document.getElementById('recurringModal').showModal();
+      }
+
+      document.getElementById('btnAddRecurring').addEventListener('click', () => openRecurringModal(null));
+      document.getElementById('btnCloseRecModal').addEventListener('click', () => document.getElementById('recurringModal').close());
+      document.getElementById('btnRecScopeMonth').addEventListener('click', () => setRecScope(true));
+      document.getElementById('btnRecScopeAll').addEventListener('click', () => setRecScope(false));
+      document.getElementById('recModeIndef').addEventListener('click', () => setRecMode(false));
+      document.getElementById('recModeQuota').addEventListener('click', () => setRecMode(true));
+
+      document.getElementById('recTypeExpense').addEventListener('click', () => setRecType('expense'));
+      document.getElementById('recTypeIncome').addEventListener('click', () => setRecType('income'));
+      document.querySelectorAll('.sched-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const mode = btn.getAttribute('data-sched');
+          setRecSchedule(mode);
+          if (mode === 'custom') document.getElementById('recDay').focus();
+        });
+      });
+
+      document.querySelectorAll('.rec-preset').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const [type, concept, cat, amt, day, quotas] = btn.getAttribute('data-rec-preset').split('|');
+          setRecType(type);
+          document.getElementById('recConcept').value = concept;
+          document.getElementById('recCategory').value = cat;
+          if (amt) document.getElementById('recAmount').value = amt;
+          const pDay = Number(day) || 15;
+          setRecSchedule(pDay === 31 ? '31' : pDay === 15 ? '15' : 'custom', pDay);
+          const q = Number(quotas) || 0;
+          setRecMode(type === 'expense' && q > 0);
+          if (type === 'expense' && q > 0) document.getElementById('recInstallments').value = String(q);
+          document.getElementById('recAmount').focus();
+        });
+      });
+
+      document.getElementById('recurringForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!ready || pending) return;
+        const editId = document.getElementById('recEditId').value;
+        const startMonth = document.getElementById('recEditStartMonth').value;
+        const item = {
+          id: editId || undefined,
+          onlyThisMonth: Boolean(editId && recOnlyThisMonth),
+          type: recType,
+          startMonth: startMonth || undefined,
+          concept: document.getElementById('recConcept').value.trim(),
+          amount: Number(document.getElementById('recAmount').value),
+          dayOfMonth: Number(document.getElementById('recDay').value),
+          category: document.getElementById('recCategory').value,
+          payment: document.getElementById('recPayment').value,
+          totalInstallments: recIsQuota ? (Number(document.getElementById('recInstallments').value) || 0) : 0
+        };
+        if (!item.concept || !(item.amount > 0)) return;
+        callServer('finanzasSaveRecurring', [item, monthKey()], data => {
+          document.getElementById('recurringModal').close();
+          applyMonth(data);
+          showToast(editId ? 'Pago fijo actualizado' : 'Pago fijo activado automáticamente');
+        });
+      });
+
+      document.getElementById('recurringList').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-rec-action]');
+        if (!btn || pending) return;
+        const id = btn.getAttribute('data-rec-id');
+        const action = btn.getAttribute('data-rec-action');
+        if (action === 'edit') {
+          const item = (state.recurring || []).find(r => r.id === id);
+          if (item) openRecurringModal(item);
+        } else if (action === 'toggle') {
+          const currentlyActive = btn.getAttribute('data-rec-active') === 'true';
+          callServer('finanzasToggleRecurring', [id, !currentlyActive, monthKey()], data => {
+            applyMonth(data);
+            showToast(currentlyActive ? 'Pago fijo pausado' : 'Pago fijo reactivado');
+          });
+        } else if (action === 'delete') {
+          const item = (state.recurring || []).find(r => r.id === id);
+          openConfirm('¿Eliminar pago fijo?', `Dejará de descontarse "${item ? item.concept : 'este pago'}" en los próximos meses.`, () => {
+            callServer('finanzasDeleteRecurring', [id, monthKey()], data => {
+              applyMonth(data);
+              showToast('Pago fijo eliminado');
+            });
+          });
+        }
+      });
+
+      let currentPendingSave = 0;
+
+      function renderPiggyNudge({ effIncome, goal, saved, todayIso, monthTx }) {
+        const card = document.getElementById('piggyNudgeCard');
+        if (!card) return;
+        const isCurrentMonth = todayIso.startsWith(monthKey());
+        const pendingSave = Math.max(0, Math.round((goal - saved) * 100) / 100);
+        currentPendingSave = pendingSave;
+
+        if (!isCurrentMonth || effIncome <= 0 || pendingSave <= 0) {
+          card.hidden = true;
+          return;
+        }
+
+        // Only show on the exact scheduled payday (or if a Sueldo income was logged today)
+        const todayDay = Number(todayIso.slice(8, 10));
+        const daysInCurMonth = new Date(state.selectedYear, state.selectedMonth + 1, 0).getDate();
+        const fixedSalaries = (state.recurring || []).filter(r => r && r.active !== false && r.type === 'income');
+        const isScheduledPayday = fixedSalaries.some(r => {
+          const targetDay = Math.min(Math.max(1, Number(r.dayOfMonth) || 1), daysInCurMonth);
+          return todayDay === targetDay;
+        });
+        const loggedSalaryToday = monthTx.some(t => t.type === 'income' && t.category === 'Sueldo' && t.date === todayIso);
+
+        if (!isScheduledPayday && !loggedSalaryToday) {
+          card.hidden = true;
+          return;
+        }
+
+        card.hidden = false;
+        const pct = effIncome > 0 ? Math.round((goal / effIncome) * 100) : 20;
+        document.getElementById('piggyNudgeTitle').textContent = `¡Hoy cobras! Ahorra ${fmtMoney(pendingSave)} (${pct}%)`;
+        document.getElementById('piggyNudgeSub').textContent = 'Toca para apartar tu ahorro de este mes';
+      }
+
+      document.getElementById('btnQuickSaveGoal').addEventListener('click', () => {
+        if (!ready || pending || currentPendingSave <= 0) return;
+        const tx = {
+          id: crypto.randomUUID(),
+          type: 'saving',
+          concept: 'Ahorro mensual (meta)',
+          amount: currentPendingSave,
+          date: getTodayIso(),
+          category: 'Ahorro',
+          payment: ''
+        };
+        callServer('finanzasSave', [tx, false], data => {
+          applyMonth(data);
+          switchTab('Ahorro');
+          showSavingCelebration(tx.amount);
+          showToast(`¡Apartaste ${fmtMoney(tx.amount)} de ahorro!`);
+        });
+      });
+
+      document.getElementById('setBaseIncome').addEventListener('input', (e) => {
+        const inc = Math.max(0, Number(e.target.value) || 0);
+        const goal20 = Math.round(inc * 0.20 * 100) / 100;
+        const cap80 = Math.max(0, Math.round((inc - goal20) * 100) / 100);
+        document.getElementById('setSavingsGoal').value = String(goal20);
+        document.getElementById('setMaxCap').value = String(cap80);
+        syncBudgetPreview();
+      });
+
+      document.getElementById('setSavingsGoal').addEventListener('input', (e) => {
+        const inc = Math.max(0, Number(document.getElementById('setBaseIncome').value) || 0);
+        if (inc > 0) {
+          const g = Math.max(0, Number(e.target.value) || 0);
+          document.getElementById('setMaxCap').value = String(Math.max(0, Math.round((inc - g) * 100) / 100));
+        }
+        syncBudgetPreview();
+      });
+
+      document.getElementById('btnReset8020').addEventListener('click', () => {
+        const inc = Number(document.getElementById('setBaseIncome').value) || 0;
+        if (inc <= 0) { showToast('Primero ingresa tu sueldo mensual', 'warn'); return; }
+        const goal20 = Math.round(inc * 0.20 * 100) / 100;
+        document.getElementById('setSavingsGoal').value = String(goal20);
+        document.getElementById('setMaxCap').value = String(Math.max(0, Math.round((inc - goal20) * 100) / 100));
+        syncBudgetPreview();
+        showToast('Aplicada regla 80% gastos / 20% ahorro');
+      });
+
+      // Direct '+ Registrar ahorro' button inside Ahorro tab
+      document.getElementById('btnQuickRegisterSaving').addEventListener('click', () => {
+        openTxModal(null);
+        setFormType('saving');
+        document.getElementById('txAmount').focus();
+      });
+
+      // Native mobile backdrop tap-to-close on all bottom-sheet dialogs
+      ['txModal', 'outingsModal', 'recurringModal'].forEach(id => {
+        const dlg = document.getElementById(id);
+        if (!dlg) return;
+        dlg.addEventListener('click', (e) => {
+          if (e.target === dlg) dlg.close();
+        });
+      });
+
+      // Init
+      setControls();
+      switchTab('Inicio');
+      window.addEventListener('DOMContentLoaded', () => {
+ });
+      if (!hasAppsScript()) {
+        document.getElementById('pwaTokenSettings').hidden = false;
+        if ('serviceWorker' in navigator && window.isSecureContext) {
+          navigator.serviceWorker.register('./sw.js').catch(console.error);
+        }
+      }
+      loadMonth();
+    })();
+  </script>
+</body>
+</html>
