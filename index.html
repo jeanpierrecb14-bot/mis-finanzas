@@ -275,7 +275,7 @@
           <div class="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 space-y-2.5 relative z-10">
             <div class="grid grid-cols-2 divide-x divide-white/15">
               <div class="pr-3">
-                <div class="text-[11px] uppercase tracking-wider text-cyan-100/75 font-bold">Ingresos</div>
+                <div id="heroIncomeLabel" class="text-[11px] uppercase tracking-wider text-cyan-100/75 font-bold">Ingresos</div>
                 <div id="heroIncome" class="text-sm font-extrabold text-white mt-0.5 truncate">—</div>
               </div>
               <div class="pl-3 text-right">
@@ -1672,7 +1672,9 @@
 
         document.getElementById('heroBalance').textContent = fmtMoney(balance);
         document.getElementById('heroTodaySpent').textContent = todayIso.startsWith(monthKey()) ? `Hoy gastaste ${fmtMoney(todaySpent)}` : 'Saldo del mes seleccionado';
-        document.getElementById('heroIncome').textContent = fmtMoney(effIncome);
+        const spendableIncome = Math.max(0, effIncome - saved);
+        document.getElementById('heroIncomeLabel').textContent = saved > 0 ? 'Para gastar' : 'Ingresos';
+        document.getElementById('heroIncome').textContent = fmtMoney(spendableIncome);
         document.getElementById('heroExpenses').textContent = fmtMoney(totalExp);
         document.getElementById('resumenTotalBadge').textContent = fmtMoney(totalExp);
 
