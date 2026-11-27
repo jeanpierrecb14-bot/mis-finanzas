@@ -1323,13 +1323,10 @@
         });
       }
 
-      function fmtMoney(v, compact = false) {
+      function fmtMoney(v) {
         if (hideAmounts) return '••••';
         const n = Number(v) || 0;
         const sign = n < 0 ? '-' : '';
-        if (compact) {
-          return `${sign}${state.settings.currency} ${Math.abs(n).toLocaleString('es-PE', { maximumFractionDigits: 0 })}`;
-        }
         return `${sign}${state.settings.currency} ${Math.abs(n).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
 
@@ -1555,7 +1552,7 @@
           }
         }
 
-        const recNote = plan.reservedUpcoming > 0 ? ` · ${fmtMoney(plan.reservedUpcoming, true)} fijos reservados` : '';
+        const recNote = plan.reservedUpcoming > 0 ? ` · ${fmtMoney(plan.reservedUpcoming)} fijos reservados` : '';
         const shortNote = plan.left === null
           ? missing
           : plan.over
@@ -1594,7 +1591,7 @@
             ? 'bg-[#c2410c] text-white border-[#c2410c]'
             : (i === 0 ? 'bg-[#1F566A] text-white border-[#1F566A]' : 'bg-[#F6F8FA] text-slate-700 border-slate-200/70 hover:border-[#2B7C85]/40');
           btn.className = `rounded-2xl px-3 py-2 border text-center min-w-[74px] transition ${chipStyle}`;
-          btn.innerHTML = `<div class="text-[11px] font-bold ${day.outing || i === 0 ? 'opacity-90' : 'text-slate-600'}">${iconPrefix}${dayShort}</div><div class="text-xs font-extrabold mt-0.5">${day.amount === null ? '—' : fmtMoney(day.amount, true)}</div>`;
+          btn.innerHTML = `<div class="text-[11px] font-bold ${day.outing || i === 0 ? 'opacity-90' : 'text-slate-600'}">${iconPrefix}${dayShort}</div><div class="text-xs font-extrabold mt-0.5">${day.amount === null ? '—' : fmtMoney(day.amount)}</div>`;
           li.appendChild(btn);
           return li;
         });
@@ -1936,12 +1933,12 @@
         const remCap = cap - sumExp;
 
         // Update Resumen KPI Inset Cards & Status Pill
-        document.getElementById('resumenDonutVal').textContent = fmtMoney(sumExp, true);
+        document.getElementById('resumenDonutVal').textContent = fmtMoney(sumExp);
         document.getElementById('resumenCumVal').textContent = fmtMoney(sumExp);
         document.getElementById('resumenCumSub').textContent = effInc > 0 ? `${incPct}% de tus ingresos` : `${expenses.length} gastos`;
         document.getElementById('resumenCapVal').textContent = cap > 0 ? fmtMoney(cap) : 'Sin tope';
         document.getElementById('resumenCapSub').textContent = cap > 0
-          ? (remCap >= 0 ? `Margen: ${fmtMoney(remCap, true)}` : `Excedido: ${fmtMoney(Math.abs(remCap), true)}`)
+          ? (remCap >= 0 ? `Margen: ${fmtMoney(remCap)}` : `Excedido: ${fmtMoney(Math.abs(remCap))}`)
           : 'Configura tu sueldo';
 
         const statusPill = document.getElementById('resumenStatusPill');
