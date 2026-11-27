@@ -366,6 +366,12 @@
           </div>
         </section>
 
+        <section id="debtUpcoming" class="stitch-glass rounded-2xl p-4 space-y-3" hidden>
+          <h2 class="text-sm font-extrabold">Próximos pagos</h2>
+          <p id="debtReserveLabel" class="text-sm text-slate-600"></p>
+          <div id="debtList" class="space-y-3"></div>
+        </section>
+
         <!-- Movimientos with Stitch Pill Filter Tabs -->
         <div class="space-y-2.5">
           <div class="flex items-center justify-between px-0.5">
@@ -881,6 +887,37 @@
     </dialog>
 
     <!-- Bottom Sheet Modal: Quick Add / Edit Transaction (Decluttered UX/UI) -->
+    <dialog id="debtModal" aria-labelledby="debtTitle" class="sheet-dialog fixed inset-0 bg-transparent items-end justify-center">
+      <div class="sheet-slide bg-white rounded-t-3xl w-full p-4 space-y-3" style="max-height:85dvh;overflow:auto">
+        <h2 id="debtTitle" class="text-base font-extrabold">Préstamo o deuda</h2>
+        <form id="debtForm" class="space-y-3">
+          <div id="debtCreateFields" class="space-y-3">
+            <label class="block">Tipo
+              <select id="debtType" class="w-full border rounded-xl p-3">
+                <option value="received">Me prestaron dinero</option>
+                <option value="owed">Ya le debo a alguien</option>
+              </select>
+            </label>
+            <p id="debtHint" class="text-sm text-slate-600"></p>
+            <label class="block">¿A quién le debes?
+              <input id="debtPerson" maxlength="60" class="w-full border rounded-xl p-3" required>
+            </label>
+            <label class="block">Monto
+              <input id="debtAmount" type="number" inputmode="decimal" min="0.01" step="0.01" class="w-full border rounded-xl p-3" required>
+            </label>
+          </div>
+          <label class="block"><span id="debtDateLabel">Fecha de devolución</span>
+            <input id="debtDate" type="date" class="w-full border rounded-xl p-3" required>
+          </label>
+          <p id="debtStatus" role="status" class="text-sm"></p>
+          <div class="flex gap-3">
+            <button id="debtCancel" type="button" class="border rounded-xl p-3">Cancelar</button>
+            <button id="debtSubmit" class="flex-1 rounded-xl p-3 bg-[#003e51] text-white font-bold">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
     <dialog id="txModal" aria-labelledby="txModalTitle" class="sheet-dialog fixed inset-0 bg-transparent items-end justify-center">
       <div class="sheet-slide bg-white w-full rounded-t-3xl p-5 shadow-2xl max-h-[88vh] overflow-y-auto">
         <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3.5"></div>
@@ -899,6 +936,7 @@
           <button id="typeSavingBtn" type="button" class="py-2 rounded-xl text-xs font-bold text-[#525a5e] transition">Ahorro</button>
         </div>
 
+        <button type="button" id="openDebt" hidden class="w-full rounded-xl border p-3 text-sm font-bold">Préstamo o deuda</button>
         <form id="txForm" class="space-y-3.5">
           <input type="hidden" id="txEditId" value="" />
 
@@ -1249,6 +1287,8 @@
         state.selectedMonth = Number(data.month.slice(5, 7)) - 1;
         state.settings = data.settings;
         state.transactions = data.transactions;
+        state.debts = data.debts;
+        document.getElementById('openDebt').hidden = !Array.isArray(data.debts);
         state.outings = data.outings || { weekly: [], overrides: {} };
         if (Array.isArray(data.recurring)) state.recurring = data.recurring;
         if (typeof data.calendarSync === 'boolean') state.calendarSync = data.calendarSync;
@@ -1641,7 +1681,8 @@
         const recAmtFor = (r, mk) => (r && r.monthOverrides && Number(r.monthOverrides[mk]) > 0) ? Number(r.monthOverrides[mk]) : Number(r && r.amount || 0);
 
         const saved = monthTx.filter(t => t.type === 'saving').reduce((sum, t) => sum + Number(t.amount), 0);
-        const balance = effIncome - totalExp - saved;
+        const reservedDebt = renderDebtList();
+        const balance = effIncome - totalExp - saved - reservedDebt;
         const capPct = maxCap > 0 ? (totalExp / maxCap) * 100 : 0;
         const capLabel = Math.floor(capPct);
         const remCap = maxCap - totalExp;
@@ -1667,13 +1708,13 @@
 
         renderOutingPlan(todayIso.startsWith(mKey), {
           income: effIncome, cap: maxCap, goal, saved, spent: totalExp, spentToday: todaySpent,
-          daysLeft, todayIso, daysInMonth, capPct, threshold, upcomingRecurring
+          daysLeft, todayIso, daysInMonth, capPct, threshold, upcomingRecurring: upcomingRecurring + reservedDebt
         });
 
         document.getElementById('heroBalance').textContent = fmtMoney(balance);
         document.getElementById('heroTodaySpent').textContent = todayIso.startsWith(monthKey()) ? `Hoy gastaste ${fmtMoney(todaySpent)}` : 'Saldo del mes seleccionado';
-        const spendableIncome = Math.max(0, effIncome - saved);
-        document.getElementById('heroIncomeLabel').textContent = saved > 0 ? 'Para gastar' : 'Ingresos';
+        const spendableIncome = Math.max(0, effIncome - saved - reservedDebt);
+        document.getElementById('heroIncomeLabel').textContent = saved > 0 || reservedDebt > 0 ? 'Para gastar' : 'Ingresos';
         document.getElementById('heroIncome').textContent = fmtMoney(spendableIncome);
         document.getElementById('heroExpenses').textContent = fmtMoney(totalExp);
         document.getElementById('resumenTotalBadge').textContent = fmtMoney(totalExp);
@@ -2093,6 +2134,7 @@
           document.getElementById('txDate').value = getDefaultDate();
           document.getElementById('txPayment').value = '';
         }
+        document.getElementById('openDebt').hidden = Boolean(editTx) || !Array.isArray(state.debts);
         document.getElementById('txModal').showModal();
       }
 
@@ -2150,6 +2192,94 @@
       });
 
       document.getElementById('btnEditLimitsFromGoals').addEventListener('click', () => switchTab('Ajustes'));
+      const debtEl = id => document.getElementById(id);
+      let selectedDebtId;
+      let debtAction;
+      function openDebtForm(action, id) {
+        if (pending || !ready) return;
+        debtAction = action;
+        selectedDebtId = id || 'debt-' + crypto.randomUUID();
+        const create = action === 'create';
+        debtEl('debtForm').reset();
+        debtEl('debtTitle').textContent = create ? 'Préstamo o deuda' : 'Registrar pago de deuda';
+        debtEl('debtCreateFields').hidden = !create;
+        debtEl('debtPerson').disabled = !create;
+        debtEl('debtAmount').disabled = !create;
+        debtEl('debtDateLabel').textContent = create ? 'Fecha de devolución' : 'Fecha en que pagaste';
+        debtEl('debtDate').max = create ? '' : getTodayIso();
+        debtEl('debtDate').value = create ? '' : getTodayIso();
+        debtEl('debtStatus').textContent = '';
+        debtEl('debtSubmit').textContent = create ? 'Guardar deuda' : 'Confirmar pago';
+        updateDebtHint();
+        debtEl('debtModal').showModal();
+      }
+      function updateDebtHint() {
+        debtEl('debtHint').textContent = debtEl('debtType').value === 'received'
+          ? 'El monto se suma al saldo del mes en que recibiste el dinero.'
+          : 'El monto queda pendiente de pago y tu saldo de hoy conserva los ingresos registrados.';
+      }
+      function renderDebtList() {
+        const current = getTodayIso();
+        const selected = monthKey();
+        const live = (state.debts || []).filter(debt => !debt.paid && debt.created.slice(0, 7) <= selected);
+        const dueMonth = debt => selected === current.slice(0, 7) ? debt.due.slice(0, 7) <= selected : debt.due.slice(0, 7) === selected;
+        const due = live.filter(dueMonth);
+        const reserve = selected < current.slice(0, 7) ? 0 : due.reduce((sum, debt) => sum + Math.round(debt.amount * 100), 0) / 100;
+        const upcoming = selected === current.slice(0, 7) ? live : due;
+        upcoming.sort((a, b) => a.due.localeCompare(b.due));
+        debtEl('debtUpcoming').hidden = !upcoming.length;
+        debtEl('debtReserveLabel').textContent = reserve ? fmtMoney(reserve) + ' reservados este mes' : '';
+        debtEl('debtList').replaceChildren(...upcoming.map(debt => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between gap-3';
+          const detail = document.createElement('span');
+          detail.className = 'text-sm';
+          detail.textContent = debt.person + ' · ' + fmtMoney(debt.amount) + ' · ' + fmtShortDate(debt.due) + (debt.due < current ? ' · Vencida' : '');
+          const button = document.createElement('button');
+          button.className = 'border rounded-xl p-3 text-xs font-bold';
+          button.type = 'button';
+          button.textContent = 'Marcar como pagado';
+          button.addEventListener('click', () => openDebtForm('pay', debt.id));
+          row.append(detail, button);
+          return row;
+        }));
+        return reserve;
+      }
+      debtEl('openDebt').addEventListener('click', () => {
+        closeTxModal();
+        openDebtForm('create');
+      });
+      debtEl('debtType').addEventListener('change', updateDebtHint);
+      debtEl('debtCancel').addEventListener('click', () => debtEl('debtModal').close());
+      debtEl('debtModal').addEventListener('cancel', event => { if (pending) event.preventDefault(); });
+      debtEl('debtForm').addEventListener('submit', event => {
+        event.preventDefault();
+        if (pending) return;
+        const action = debtAction;
+        const id = selectedDebtId;
+        const date = debtEl('debtDate').value;
+        const input = action === 'create'
+          ? {action, id, due: date, person: debtEl('debtPerson').value.trim(),
+            amount: Number(debtEl('debtAmount').value), received: debtEl('debtType').value === 'received'}
+          : {action, id, paid: date};
+        if (action === 'create' && !input.person) {
+          debtEl('debtStatus').textContent = 'Escribe a quién le debes.';
+          debtEl('debtPerson').focus();
+          return;
+        }
+        debtEl('debtSubmit').disabled = debtEl('debtCancel').disabled = true;
+        debtEl('debtStatus').textContent = 'Guardando…';
+        const enable = () => { debtEl('debtSubmit').disabled = debtEl('debtCancel').disabled = false; };
+        callServer('finanzasDebt', [input, monthKey()], data => {
+          enable();
+          debtEl('debtModal').close();
+          applyMonth(data);
+          showToast(action === 'create' ? 'Deuda guardada' : 'Pago registrado');
+        }, message => {
+          enable();
+          debtEl('debtStatus').textContent = message;
+        });
+      });
       document.getElementById('btnFabAdd').addEventListener('click', () => openTxModal(null));
       document.getElementById('btnCloseTxModal').addEventListener('click', closeTxModal);
       document.getElementById('typeExpenseBtn').addEventListener('click', () => setFormType('expense'));
